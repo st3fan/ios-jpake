@@ -7,10 +7,10 @@
 
 - (void) testPasswordExchange
 {
-	JPAKEParty* a = [JPAKEParty partyWithPassword: @"all you need is cheese" signerIdentity: @"Alice" peerIdentity: @"Bob"];
+	JPAKEParty* a = [JPAKEParty partyWithPassword: @"all you need is cheese" modulusLength: 1024 signerIdentity: @"Alice" peerIdentity: @"Bob"];
 	STAssertNotNil(a, @"a should not be nil");
 	
-	JPAKEParty* b = [JPAKEParty partyWithPassword: @"all you need is cheese" signerIdentity: @"Bob" peerIdentity: @"Alice"];
+	JPAKEParty* b = [JPAKEParty partyWithPassword: @"all you need is cheese" modulusLength: 1024 signerIdentity: @"Bob" peerIdentity: @"Alice"];
 	STAssertNotNil(a, @"b should not be nil");
 	
 	NSDictionary* a1 = [a generateMessageOne];
@@ -62,10 +62,10 @@
 
 - (void) testPasswordExchangeWithWrongPasswords
 {
-	JPAKEParty* a = [JPAKEParty partyWithPassword: @"all you need is cheese" signerIdentity: @"Alice" peerIdentity: @"Bob"];
+	JPAKEParty* a = [JPAKEParty partyWithPassword: @"all you need is cheese" modulusLength: 1024 signerIdentity: @"Alice" peerIdentity: @"Bob"];
 	STAssertNotNil(a, @"a should not be nil");
 	
-	JPAKEParty* b = [JPAKEParty partyWithPassword: @"all you need is bacon" signerIdentity: @"Bob" peerIdentity: @"Alice"];
+	JPAKEParty* b = [JPAKEParty partyWithPassword: @"all you need is bacon" modulusLength: 1024 signerIdentity: @"Bob" peerIdentity: @"Alice"];
 	STAssertNotNil(a, @"b should not be nil");
 	
 	NSDictionary* a1 = [a generateMessageOne];

@@ -9,8 +9,8 @@
 	JPAKE_CTX* _ctx;
 }
 
-+ (id) partyWithPassword: (NSString*) password signerIdentity: (NSString*) signerIdentity peerIdentity: (NSString*) peerIdentity;
-- (id) initWithPassword: (NSString*) password signerIdentity: (NSString*) signerIdentity peerIdentity: (NSString*) peerIdentity;
++ (id) partyWithPassword: (NSString*) password modulusLength: (NSUInteger) modulesLength signerIdentity: (NSString*) signerIdentity peerIdentity: (NSString*) peerIdentity;
+- (id) initWithPassword: (NSString*) password modulusLength: (NSUInteger) modulesLength signerIdentity: (NSString*) signerIdentity peerIdentity: (NSString*) peerIdentity;
 
 - (NSDictionary*) generateMessageOne;
 - (NSDictionary*) generateMessageTwoFromMessageOne: (NSDictionary*) one;
