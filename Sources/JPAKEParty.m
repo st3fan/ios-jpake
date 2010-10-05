@@ -6,7 +6,7 @@ static NSString* BIGNUM2NSString(BIGNUM* bn)
 {
 	NSString* result = nil;
 
-	const char* s = BN_bn2dec(bn);
+	const char* s = BN_bn2hex(bn);
 	if (s != nil) {
 		result = [NSString stringWithCString: s encoding: NSASCIIStringEncoding];
 		OPENSSL_free((void*) s);
@@ -17,7 +17,7 @@ static NSString* BIGNUM2NSString(BIGNUM* bn)
 
 static void NSString2BIGNUM(NSString* s, BIGNUM** bn)
 {
-	BN_asc2bn(bn, [s cStringUsingEncoding: NSASCIIStringEncoding]);
+	BN_hex2bn(bn, [s cStringUsingEncoding: NSASCIIStringEncoding]);
 }
 
 @implementation JPAKEParty
