@@ -7,7 +7,10 @@
   @private
 	NSString* _signerIdentity;
 	JPAKE_CTX* _ctx;
+	BIGNUM* _secret;
 }
+
+@property (nonatomic,readonly) NSString* hashedPassword;
 
 + (id) partyWithPassword: (NSString*) password modulusLength: (NSUInteger) modulesLength signerIdentity: (NSString*) signerIdentity peerIdentity: (NSString*) peerIdentity;
 - (id) initWithPassword: (NSString*) password modulusLength: (NSUInteger) modulesLength signerIdentity: (NSString*) signerIdentity peerIdentity: (NSString*) peerIdentity;

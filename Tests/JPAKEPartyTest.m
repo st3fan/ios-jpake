@@ -124,4 +124,25 @@
 	[self runPasswordExchangeWithLeftParty: a rightParty: b keysShouldBeDifferent: YES];
 }
 
+- (void) testPasswordHashing1024
+{
+	JPAKEParty* party = [JPAKEParty partyWithPassword: @"Cheese" modulusLength: 1024 signerIdentity: @"Alice" peerIdentity: @"Bob"];
+	STAssertNotNil(party, @"party is nil");
+	STAssertEqualObjects(party.hashedPassword, @"467553036704488116065235374284249771519791397284", @"hashed password is incorrect");
+}
+
+- (void) testPasswordHashing2048
+{
+	JPAKEParty* party = [JPAKEParty partyWithPassword: @"Cheese" modulusLength: 2048 signerIdentity: @"Alice" peerIdentity: @"Bob"];
+	STAssertNotNil(party, @"party is nil");
+	STAssertEqualObjects(party.hashedPassword, @"11668405708764818650272624446752744986731075332587888492029318309688", @"hashed password is incorrect");
+}
+
+- (void) testPasswordHashing3072
+{
+	JPAKEParty* party = [JPAKEParty partyWithPassword: @"Cheese" modulusLength: 3072 signerIdentity: @"Alice" peerIdentity: @"Bob"];
+	STAssertNotNil(party, @"party is nil");
+	STAssertEqualObjects(party.hashedPassword, @"49914049577602701120425166869859436727846780221279457242596183953197655477784", @"hashed password is incorrect");
+}
+
 @end

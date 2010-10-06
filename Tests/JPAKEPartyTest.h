@@ -15,4 +15,8 @@
 - (void) testPasswordExchange3072;
 - (void) testPasswordExchangeWithWrongPasswords3072;
 
+- (void) testPasswordHashing1024;
+- (void) testPasswordHashing2048;
+- (void) testPasswordHashing3072;
+
 @end

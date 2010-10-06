@@ -1,5 +1,6 @@
 // JPAKEParty.m
 
+#include <openssl/evp.h>
 #import "JPAKEParty.h"
 
 static NSString* BIGNUM2NSString(BIGNUM* bn)
@@ -20,7 +21,72 @@ static void NSString2BIGNUM(NSString* s, BIGNUM** bn)
 	BN_hex2bn(bn, [s cStringUsingEncoding: NSASCIIStringEncoding]);
 }
 
+static BIGNUM* HashPassword(NSString* password, BIGNUM* q)
+{
+	BIGNUM* secret = NULL;
+
+	const EVP_MD* md = EVP_get_digestbyname("SHA256");
+	if (md != NULL)
+	{
+		NSData* passwordData = [password dataUsingEncoding: NSUTF8StringEncoding];
+		if (passwordData != nil)
+		{
+			// SHA256 Hash the password
+		
+			unsigned char md_value[EVP_MAX_MD_SIZE];
+			unsigned int md_len;	
+			EVP_MD_CTX mdctx;
+
+			EVP_MD_CTX_init(&mdctx);
+			EVP_DigestInit_ex(&mdctx, md, NULL);
+			EVP_DigestUpdate(&mdctx, [passwordData bytes], [passwordData length]);
+			EVP_DigestFinal_ex(&mdctx, md_value, &md_len);
+			EVP_MD_CTX_cleanup(&mdctx);
+			
+			// Convert the hash to a big number
+			
+			BIGNUM* hashed_password = BN_new();
+			if (hashed_password != NULL)
+			{
+				BN_bin2bn(md_value, md_len, hashed_password);
+				
+				// Calculate 1 + (hashed_password % (q-1))
+
+				BN_CTX* bn_ctx = BN_CTX_new();
+				if (bn_ctx != NULL)
+				{
+					BIGNUM* q_minus_one = BN_dup(q);
+					if (q_minus_one != NULL)
+					{
+						BN_sub_word(q_minus_one, 1);
+
+						secret = BN_new();
+						if (secret != NULL)
+						{
+							BN_mod(secret, hashed_password, q_minus_one, bn_ctx);
+							BN_add_word(secret, 1);
+						}
+						
+						BN_free(q_minus_one);
+					}
+					
+					BN_CTX_free(bn_ctx);
+				}
+				
+				BN_clear_free(hashed_password);
+			}
+		}
+	}
+	
+	return secret;
+}
+
 @implementation JPAKEParty
+
++ (void) initialize
+{
+	OpenSSL_add_all_digests();
+}
 
 + (id) partyWithPassword: (NSString*) password modulusLength: (NSUInteger) modulusLength signerIdentity: (NSString*) signerIdentity peerIdentity: (NSString*) peerIdentity
 {
@@ -58,21 +124,38 @@ static void NSString2BIGNUM(NSString* s, BIGNUM** bn)
 				[self release];
 				return nil;
 		}
-
-		BIGNUM* secret = NULL;
-		BN_asc2bn(&secret, [password cStringUsingEncoding: NSASCIIStringEncoding]);
-	
-		_ctx = JPAKE_CTX_new(
-			[signerIdentity cStringUsingEncoding: NSASCIIStringEncoding],
-			[peerIdentity cStringUsingEncoding: NSASCIIStringEncoding],
-			p, g, q, secret
-		);
 		
-		BN_free(secret);
+		if (p != NULL && g != NULL && q != NULL)
+		{
+			_secret = HashPassword(password, q);
+			if (_secret != NULL)
+			{
+				_ctx = JPAKE_CTX_new(
+					[signerIdentity cStringUsingEncoding: NSASCIIStringEncoding],
+					[peerIdentity cStringUsingEncoding: NSASCIIStringEncoding],
+					p, g, q, _secret
+				);
+			}
+		}
 		
-		BN_free(q);
-		BN_free(g);
-		BN_free(p);		
+		if (q != NULL) {
+			BN_free(q);
+		}
+		
+		if (g != NULL) {
+			BN_free(g);
+		}
+		
+		if (p != NULL) {
+			BN_free(p);
+		}
+		
+		// If we were unable to create the JPAKE_CTX then something went wrong and we fail.
+		
+		if (_ctx == NULL) {
+			[self release];
+			return nil;
+		}
 	}
 	return self;
 }
@@ -80,6 +163,12 @@ static void NSString2BIGNUM(NSString* s, BIGNUM** bn)
 - (void) dealloc
 {
 	[_signerIdentity release];
+	if (_ctx != NULL) {
+		JPAKE_CTX_free(_ctx);
+	}
+	if (_secret != NULL) {
+		BN_free(_secret);
+	}
 	[super dealloc];
 }
 
@@ -179,6 +268,27 @@ static void NSString2BIGNUM(NSString* s, BIGNUM** bn)
 	
 	JPAKE_STEP2_release(&step2);
 
+	return result;
+}
+
+#pragma mark -
+
+/**
+ * Returns the hashed password as a NSString encoded big number. This method is here so that we can
+ * properly unit test the hashing of the password and compare the values to what the Python code
+ * generates.
+ */
+
+- (NSString*) hashedPassword
+{
+	NSString* result = nil;
+
+	const char* s = BN_bn2dec(_secret);
+	if (s != nil) {
+		result = [NSString stringWithCString: s encoding: NSASCIIStringEncoding];
+		OPENSSL_free((void*) s);
+	}
+	
 	return result;
 }
 
