@@ -3,14 +3,27 @@
 #include <openssl/evp.h>
 #import "JPAKEParty.h"
 
-static NSString* BIGNUM2NSString(BIGNUM* bn)
+static NSString* BIGNUM2NSString(const BIGNUM* bn)
 {
 	NSString* result = nil;
 
 	const char* s = BN_bn2hex(bn);
 	if (s != nil) {
-		result = [NSString stringWithCString: s encoding: NSASCIIStringEncoding];
+		result = [[NSString stringWithCString: s encoding: NSASCIIStringEncoding] lowercaseString];
 		OPENSSL_free((void*) s);
+	}
+	
+	return result;
+}
+
+static NSData* BIGNUM2NSData(const BIGNUM* bn)
+{
+	NSData* result = nil;
+
+	void* buffer = malloc(BN_num_bytes(bn));
+	if (buffer != NULL) {
+		BN_bn2bin(bn, buffer);
+		result = [NSData dataWithBytesNoCopy: buffer length: BN_num_bytes(bn) freeWhenDone: YES];
 	}
 	
 	return result;
@@ -259,10 +272,27 @@ static BIGNUM* HashPassword(NSString* password, BIGNUM* q)
 	if (JPAKE_STEP2_process(_ctx, &step2))
 	{
 		const BIGNUM* key = JPAKE_get_shared_key(_ctx);
-		if (key != nil) {
-			char* data = malloc(BN_num_bytes(key));
-			BN_bn2bin(key, (void*) data);
-			result = [NSData dataWithBytesNoCopy: data length: BN_num_bytes(key) freeWhenDone: YES];
+		if (key != nil)
+		{
+			NSData* keyData = BIGNUM2NSData(key);
+			if (keyData != nil)
+			{
+				const EVP_MD* md = EVP_get_digestbyname("SHA256");
+				if (md != NULL)
+				{
+					unsigned char md_value[EVP_MAX_MD_SIZE];
+					unsigned int md_len;	
+					EVP_MD_CTX mdctx;
+
+					EVP_MD_CTX_init(&mdctx);
+					EVP_DigestInit_ex(&mdctx, md, NULL);
+					EVP_DigestUpdate(&mdctx, [keyData bytes], [keyData length]);
+					EVP_DigestFinal_ex(&mdctx, md_value, &md_len);
+					EVP_MD_CTX_cleanup(&mdctx);
+					
+					result = [NSData dataWithBytes: md_value length: md_len];
+				}
+			}
 		}
 	}
 	
