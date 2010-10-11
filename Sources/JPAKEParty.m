@@ -3,6 +3,11 @@
 #include <openssl/evp.h>
 #import "JPAKEParty.h"
 
+/**
+ * Convert an OpenSSL BIGNUM to a Cocoa NSString in hex form. The resulting string is
+ * lowercase hex without 0x in front.
+ */
+
 static NSString* BIGNUM2NSString(const BIGNUM* bn)
 {
 	NSString* result = nil;
@@ -15,6 +20,10 @@ static NSString* BIGNUM2NSString(const BIGNUM* bn)
 	
 	return result;
 }
+
+/**
+ * Get the binary representation of an OpenSSL BIGNUM in a Cocoa NSData instance.
+ */
 
 static NSData* BIGNUM2NSData(const BIGNUM* bn)
 {
@@ -29,10 +38,20 @@ static NSData* BIGNUM2NSData(const BIGNUM* bn)
 	return result;
 }
 
+/**
+ * Create an OpenSSL BIGNUM from a Cocoa NSString. The String is a hex encoded big number
+ * without the 0x in front.
+ */
+
 static void NSString2BIGNUM(NSString* s, BIGNUM** bn)
 {
 	BN_hex2bn(bn, [s cStringUsingEncoding: NSASCIIStringEncoding]);
 }
+
+/**
+ * Calculate the hashed password like the J-PAKE Python code does. First make a SHA256 hash
+ * from the textual password. Then Calculate 1 + (hashed_password % (q-1)).
+ */
 
 static BIGNUM* HashPassword(NSString* password, BIGNUM* q)
 {
@@ -98,7 +117,7 @@ static BIGNUM* HashPassword(NSString* password, BIGNUM* q)
 
 + (void) initialize
 {
-	OpenSSL_add_all_digests();
+	OpenSSL_add_all_digests(); // Is it ok if this gets called multiple times?
 }
 
 + (id) partyWithPassword: (NSString*) password modulusLength: (NSUInteger) modulusLength signerIdentity: (NSString*) signerIdentity peerIdentity: (NSString*) peerIdentity

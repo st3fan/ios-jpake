@@ -8,10 +8,8 @@
 @class JPAKEClient;
 
 @protocol JPAKEClientDelegate
-- (void) client: (JPAKEClient*) client didChangeToState: (int) state;
 - (void) client: (JPAKEClient*) client didGenerateSecret: (NSString*) secret;
 - (void) client: (JPAKEClient*) client didFailWithError: (NSError*) error;
-- (void) client: (JPAKEClient*) client didExchangeKey: (NSData*) key;
 - (void) client: (JPAKEClient*) client didReceivePayload: (id) payload;
 @end
 

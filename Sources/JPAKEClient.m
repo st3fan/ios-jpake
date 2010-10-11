@@ -1,6 +1,16 @@
 // JPAKEClient.m
 
-// TODO: Comments, keep _request around, implement cancel, clean up properly, better validation of messages, better handling of failure, error codes
+// TODO:
+//
+//    Comments
+//    keep _request around
+//    implement cancel
+//    clean up properly
+//    better validation of messages
+//    better handling of failure
+//    error codes
+//    delegate method that updates progress
+//
 
 #import "NSData+AES.h"
 #import "NSData+Base64.h"
@@ -139,7 +149,7 @@
 {
 	NSLog(@"JPAKEClient#putMobileMessageThree");
 
-	NSDictionary* message = [self messageWithType: @"s3" payload: [[_key SHA256Hash] base16Encoding]];
+	NSDictionary* message = [self messageWithType: @"s3" payload: [[[_key SHA256Hash] SHA256Hash] base16Encoding]];
 	NSString* json = [message JSONRepresentation];
 	NSLog(@"   Putting %@", json);
 	NSMutableData* data = [NSMutableData dataWithData: [json dataUsingEncoding: NSUTF8StringEncoding]];
