@@ -389,7 +389,7 @@
 
 	NSLog(@"Value is %@", request.responseString);
 
-	_channel = [[request.responseString JSONValue] retain];
+	_channel = [[request.responseString substringWithRange: NSMakeRange(1, [request.responseString length] - 2)] retain];
 	_secret = [[NSString stringWithJPAKESecret] retain];
 	
 	// Generate message one and put it to the channel
