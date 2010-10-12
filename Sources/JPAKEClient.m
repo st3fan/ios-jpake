@@ -77,6 +77,57 @@
 
 #pragma mark -
 
+- (BOOL) validateBasicMessage :(NSDictionary*) message ofType: (NSString*) expectedType
+{
+	if (message == nil) {
+		return NO;
+	}
+	
+	if ([message isKindOfClass: [NSDictionary class]] == NO) {
+		return NO;
+	}
+	
+	NSString* type = [message objectForKey: @"type"];
+	if (type == nil || [type isEqualToString: expectedType] == NO) {
+		return NO;
+	}
+	
+	if ([message objectForKey: @"payload"] == nil) {
+		return NO;
+	}
+	
+	return YES;
+}
+
+- (BOOL) validateDesktopMessageOne: (NSDictionary*) message
+{
+	if ([self validateBasicMessage: message ofType: @"sender1"] == NO) {
+		return NO;
+	}
+	
+	return YES;
+}
+
+- (BOOL) validateDesktopMessageTwo: (NSDictionary*) message
+{
+	if ([self validateBasicMessage: message ofType: @"sender2"] == NO) {
+		return NO;
+	}
+
+	return YES;
+}
+
+- (BOOL) validateDesktopMessageThree: (NSDictionary*) message
+{
+	if ([self validateBasicMessage: message ofType: @"sender3"] == NO) {
+		return NO;
+	}
+
+	return YES;
+}
+
+#pragma mark -
+
 - (void) deleteChannelDidFinish: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#deleteChannelDidFinish");
@@ -116,12 +167,16 @@
 		
 		case 200: {
 			NSDictionary* message = [[request responseString] JSONValue];
+			if ([self validateDesktopMessageThree: message] == NO) {
+				[_delegate client: self didFailWithError: nil];
+				return;
+			}
 			NSLog(@"   Message is %@", message);
 			NSDictionary* payload = [message objectForKey: @"payload"];
-			NSData* iv = [[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"iv"]];
-			NSData* ct = [[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"ciphertext"]];
-			NSData* plaintext = [[NSData alloc] initWithAESEncryptedData: ct key: _key iv: iv];
-			NSString* json = [[NSString alloc] initWithData: plaintext encoding: NSUTF8StringEncoding];
+			NSData* iv = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"IV"]] autorelease];
+			NSData* ct = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"ciphertext"]] autorelease];
+			NSData* plaintext = [[[NSData alloc] initWithAESEncryptedData: ct key: _key iv: iv] autorelease];
+			NSString* json = [[[NSString alloc] initWithData: plaintext encoding: NSUTF8StringEncoding] autorelease];
 			[_delegate client: self didReceivePayload: [json JSONValue]];
 			break;
 		}
@@ -181,7 +236,9 @@
 {
 	NSLog(@"JPAKEClient#putMobileMessageThree");
 
-	NSDictionary* message = [self messageWithType: @"s3" payload: [[[_key SHA256Hash] SHA256Hash] base16Encoding]];
+	NSString* payload = [[[_key SHA256Hash] SHA256Hash] base16Encoding];
+
+	NSDictionary* message = [self messageWithType: @"receiver3" payload: payload];
 	NSString* json = [message JSONRepresentation];
 	NSLog(@"   Putting %@", json);
 	NSMutableData* data = [NSMutableData dataWithData: [json dataUsingEncoding: NSUTF8StringEncoding]];
@@ -212,8 +269,16 @@
 		
 		case 200: {
 			NSDictionary* message = [[request responseString] JSONValue];
+			if ([self validateDesktopMessageTwo: message] == NO) {
+				[_delegate client: self didFailWithError: nil];
+				return;
+			}
 			NSDictionary* payload = [message objectForKey: @"payload"];
 			_key = [[_party generateKeyFromMessageTwo: payload] retain];
+			if (_key == nil) {
+				[_delegate client: self didFailWithError: nil];
+				return;
+			}
 			[self putMobileMessageThree];
 			break;
 		}
@@ -269,7 +334,7 @@
 
 - (void) putMobileMessageTwo: (NSDictionary*) one
 {
-	NSDictionary* message = [self messageWithType: @"s2" payload: [_party generateMessageTwoFromMessageOne: one]];
+	NSDictionary* message = [self messageWithType: @"receiver2" payload: [_party generateMessageTwoFromMessageOne: one]];
 	NSString* json = [message JSONRepresentation];
 
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
@@ -298,6 +363,10 @@
 		
 		case 200: {
 			NSDictionary* message = [[request responseString] JSONValue];
+			if ([self validateDesktopMessageOne: message] == NO) {
+				[_delegate client: self didFailWithError: nil];
+				return;
+			}
 			NSDictionary* payload = [message objectForKey: @"payload"];
 			[self putMobileMessageTwo: payload];
 			break;
@@ -356,13 +425,13 @@
 
 - (void) putMessageOne
 {
-	_party = [[JPAKEParty partyWithPassword: _secret modulusLength: 1024 signerIdentity: @"Mobile" peerIdentity: @"Desktop"] retain];
+	_party = [[JPAKEParty partyWithPassword: _secret modulusLength: 1024 signerIdentity: @"receiver" peerIdentity: @"sender"] retain];
 	if (_party == nil) {
 		[_delegate client: self didFailWithError: nil];
 		return;
 	}
 	
-	NSDictionary* message = [self messageWithType: @"s1" payload: [_party generateMessageOne]];
+	NSDictionary* message = [self messageWithType: @"receiver1" payload: [_party generateMessageOne]];
 	NSString* json = [message JSONRepresentation];
 
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
