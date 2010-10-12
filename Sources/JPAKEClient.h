@@ -13,6 +13,11 @@
 - (void) client: (JPAKEClient*) client didReceivePayload: (id) payload;
 @end
 
+@interface NSString (JPAKE)
++ (NSString*) stringWithJPAKESecret;
+@end
+
+
 @interface JPAKEClient : NSObject {
   @private
 	NSURL* _server;
@@ -21,7 +26,7 @@
 	ASIHTTPRequest* _request;
 	NSTimer* _timer;
 	NSString* _channel;
-	NSString* _password;
+	NSString* _secret;
 	JPAKEParty* _party;
 	NSString* _etag;
 	NSData* _key;

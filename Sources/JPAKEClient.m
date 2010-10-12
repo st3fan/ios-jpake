@@ -19,6 +19,37 @@
 #import "JPAKEClient.h"
 #import "JSON.h"
 
+@implementation NSString (JPAKE)
+
+/**
+ * Generate a JPAKE Secret. Currently implemented as 4 random characters.
+ */
+
++ (NSString*) stringWithJPAKESecret
+{
+	NSMutableString* secret = [NSMutableString stringWithCapacity: 4];
+	
+	srandomdev();
+	
+	for (int i = 0; i < 4; i++) {
+		switch (random() % 3) {
+			case 0:
+				[secret appendFormat: @"%c", '0' + (random() % 10)];
+				break;
+			case 1:
+				[secret appendFormat: @"%c", 'a' + (random() % 26)];
+				break;
+			case 2:
+				[secret appendFormat: @"%c", 'A' + (random() % 26)];
+				break;
+		}
+	}
+	
+	return secret;
+}
+
+@end
+
 @implementation JPAKEClient
 
 - (id) initWithServer: (NSURL*) server delegate: (id<JPAKEClientDelegate>) delegate
@@ -27,6 +58,11 @@
 		_server = [server retain];
 		_delegate = delegate;
 	}
+	
+	for (int i = 0; i < 1000; i++) {
+		NSLog(@"%@", [NSString stringWithJPAKESecret]);
+	}
+	
 	return self;
 }
 
@@ -306,7 +342,7 @@
 		return;
 	}
 
-	[_delegate client: self didGenerateSecret: [NSString stringWithFormat: @"%@%@", _password, _channel]];
+	[_delegate client: self didGenerateSecret: [NSString stringWithFormat: @"%@%@", _secret, _channel]];
 
 	// Remember the etag
 	[_etag release];
@@ -324,7 +360,7 @@
 
 - (void) putMessageOne
 {
-	_party = [[JPAKEParty partyWithPassword: _password modulusLength: 1024 signerIdentity: @"Mobile" peerIdentity: @"Desktop"] retain];
+	_party = [[JPAKEParty partyWithPassword: _secret modulusLength: 1024 signerIdentity: @"Mobile" peerIdentity: @"Desktop"] retain];
 	if (_party == nil) {
 		[_delegate client: self didFailWithError: nil];
 		return;
@@ -351,7 +387,7 @@
 	NSLog(@"JPAKEClient#requestChannelDidFinish: %@", request);
 
 	_channel = [[request.responseString substringWithRange: NSMakeRange(1, [request.responseString length] - 2)] retain];
-	_password = @"Test";
+	_secret = [[NSString stringWithJPAKESecret] retain];
 	
 	// Generate message one and put it to the channel
 		
