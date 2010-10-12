@@ -59,10 +59,6 @@
 		_delegate = delegate;
 	}
 	
-	for (int i = 0; i < 1000; i++) {
-		NSLog(@"%@", [NSString stringWithJPAKESecret]);
-	}
-	
 	return self;
 }
 
@@ -386,7 +382,14 @@
 {
 	NSLog(@"JPAKEClient#requestChannelDidFinish: %@", request);
 
-	_channel = [[request.responseString substringWithRange: NSMakeRange(1, [request.responseString length] - 2)] retain];
+	if ([request responseStatusCode] != 200) {
+		[_delegate client: self didFailWithError: nil];
+		return;
+	}
+
+	NSLog(@"Value is %@", request.responseString);
+
+	_channel = [[request.responseString JSONValue] retain];
 	_secret = [[NSString stringWithJPAKESecret] retain];
 	
 	// Generate message one and put it to the channel
