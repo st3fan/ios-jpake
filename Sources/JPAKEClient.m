@@ -31,16 +31,13 @@
 	
 	srandomdev();
 	
-	for (int i = 0; i < 4; i++) {
-		switch (random() % 3) {
+	for (int i = 0; i < 8; i++) {
+		switch (random() % 2) {
 			case 0:
 				[secret appendFormat: @"%c", '0' + (random() % 10)];
 				break;
 			case 1:
 				[secret appendFormat: @"%c", 'a' + (random() % 26)];
-				break;
-			case 2:
-				[secret appendFormat: @"%c", 'A' + (random() % 26)];
 				break;
 		}
 	}
@@ -48,7 +45,25 @@
 	return secret;
 }
 
++ (NSString*) stringWithJPAKEClientIdentifier
+{
+	NSMutableString* identifier = [NSMutableString stringWithCapacity: 16];
+	
+	srandomdev();
+	
+	for (int i = 0; i < 256; i++) {
+		[identifier appendFormat: @"%x", (random() % 16)];
+	}
+	
+	return identifier;
+}
+
 @end
+
+@implementation JPAKEClient (Private)
+
+@end
+
 
 @implementation JPAKEClient
 
@@ -57,6 +72,7 @@
 	if ((self = [super init]) != nil) {
 		_server = [server retain];
 		_delegate = delegate;
+		_clientIdentifier = [[NSString stringWithJPAKEClientIdentifier] retain];
 	}
 	
 	return self;
@@ -73,6 +89,26 @@
 - (NSDictionary*) messageWithType: (NSString*) type payload: (id) payload
 {
 	return [NSDictionary dictionaryWithObjectsAndKeys: type, @"type", payload, @"payload", nil];
+}
+
+- (NSError*) errorWithCode: (NSInteger) code localizedDescriptionKey: (NSString*) localizedDescriptionKey
+{
+	NSDictionary* userInfo = [NSDictionary dictionaryWithObject: localizedDescriptionKey forKey: @"NSLocalizedDescriptionKey"];
+	return [NSError errorWithDomain: @"JPAKEClient" code: code userInfo: userInfo];
+}
+
+
+
+- (NSError*) unexpectedServerResponseError
+{
+	return [self errorWithCode: kJPAKEClientErrorUnexpectedServerResponse
+		localizedDescriptionKey: @"The server returned an unexpected response"];
+}
+
+- (NSError*) invalidServerResponseError
+{
+	return [self errorWithCode: kJPAKEClientErrorInvalidServerResponse
+		localizedDescriptionKey: @"The server returned an invalid response"];
 }
 
 #pragma mark -
@@ -102,6 +138,21 @@
 - (BOOL) validateDesktopMessageOne: (NSDictionary*) message
 {
 	if ([self validateBasicMessage: message ofType: @"sender1"] == NO) {
+		return NO;
+	}
+	
+	NSDictionary* payload = [message objectForKey: @"payload"];
+	if (payload == nil || [payload isKindOfClass: [NSDictionary class]] == NO) {
+		return NO;
+	}
+	
+	NSDictionary* zkp_x1 = [payload objectForKey: @"zkp_x1"];	
+	if (zkp_x1 == nil || [zkp_x1 isKindOfClass: [NSDictionary class]] == NO) {
+		return NO;
+	}
+	
+	NSDictionary* zkp_x2 = [payload objectForKey: @"zkp_x2"];
+	if (zkp_x2 == nil || [zkp_x2 isKindOfClass: [NSDictionary class]] == NO) {
 		return NO;
 	}
 	
@@ -145,6 +196,7 @@
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
 		[_request setRequestMethod: @"DELETE"];
+		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
 		[_request setDelegate: self];
 		[_request setDidFinishSelector: @selector(deleteChannelDidFinish:)];
 		[_request setDidFailSelector: @selector(deleteChannelDidFail:)];
@@ -168,7 +220,7 @@
 		case 200: {
 			NSDictionary* message = [[request responseString] JSONValue];
 			if ([self validateDesktopMessageThree: message] == NO) {
-				[_delegate client: self didFailWithError: nil];
+				[_delegate client: self didFailWithError: [self invalidServerResponseError]];
 				return;
 			}
 			NSLog(@"   Message is %@", message);
@@ -182,7 +234,7 @@
 		}
 		
 		default: {
-			[_delegate client: self didFailWithError: nil];
+			[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		}
 	}
 }
@@ -199,6 +251,7 @@
 	
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
+		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
 		[_request addRequestHeader: @"If-None-Match" value: _etag];
 		[_request setDelegate: self];
 		[_request setDidFinishSelector: @selector(getDesktopMessageThreeDidFinish:)];
@@ -214,7 +267,7 @@
 	NSLog(@"JPAKEClient#putMobileMessageThreeDidFinish: %@", request);
 
 	if ([request responseStatusCode] != 200) {
-		[_delegate client: self didFailWithError: nil];
+		[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		return;
 	}
 
@@ -245,6 +298,7 @@
 
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
+		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
 		[_request setRequestMethod: @"PUT"];
 		[_request setPostBody: data];
 		[_request setDelegate: self];
@@ -270,13 +324,13 @@
 		case 200: {
 			NSDictionary* message = [[request responseString] JSONValue];
 			if ([self validateDesktopMessageTwo: message] == NO) {
-				[_delegate client: self didFailWithError: nil];
+				[_delegate client: self didFailWithError: [self invalidServerResponseError]];
 				return;
 			}
 			NSDictionary* payload = [message objectForKey: @"payload"];
 			_key = [[_party generateKeyFromMessageTwo: payload] retain];
 			if (_key == nil) {
-				[_delegate client: self didFailWithError: nil];
+				[_delegate client: self didFailWithError: [self errorWithCode: -1 localizedDescriptionKey: @""]]; // TODO: What to report here?
 				return;
 			}
 			[self putMobileMessageThree];
@@ -284,7 +338,7 @@
 		}
 		
 		default: {
-			[_delegate client: self didFailWithError: nil];
+			[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		}
 	}
 }
@@ -299,6 +353,7 @@
 {
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
+		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
 		[_request setDelegate: self];
 		[_request addRequestHeader: @"If-None-Match" value: _etag];
 		[_request setDidFinishSelector: @selector(getDesktopMessageTwoDidFinish:)];
@@ -314,7 +369,7 @@
 	NSLog(@"JPAKEClient#putMobileMessageTwoDidFinish: %@", request);
 
 	if ([request responseStatusCode] != 200) {
-		[_delegate client: self didFailWithError: nil];
+		[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		return;
 	}
 
@@ -339,6 +394,7 @@
 
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
+		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
 		[_request setRequestMethod: @"PUT"];
 		[_request setPostBody: [NSMutableData dataWithData: [json dataUsingEncoding: NSUTF8StringEncoding]]];
 		[_request setDelegate: self];
@@ -364,7 +420,7 @@
 		case 200: {
 			NSDictionary* message = [[request responseString] JSONValue];
 			if ([self validateDesktopMessageOne: message] == NO) {
-				[_delegate client: self didFailWithError: nil];
+				[_delegate client: self didFailWithError: [self invalidServerResponseError]];
 				return;
 			}
 			NSDictionary* payload = [message objectForKey: @"payload"];
@@ -373,7 +429,7 @@
 		}
 		
 		default: {
-			[_delegate client: self didFailWithError: nil];
+			[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		}
 	}
 }
@@ -388,6 +444,7 @@
 {
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
+		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
 		[_request setDelegate: self];
 		[_request addRequestHeader: @"If-None-Match" value: _etag];
 		[_request setDidFinishSelector: @selector(getDesktopMessageOneDidFinish:)];
@@ -403,11 +460,12 @@
 	NSLog(@"JPAKEClient#putMessageOneDidFinish: %@", request);
 
 	if ([request responseStatusCode] != 200) {
-		[_delegate client: self didFailWithError: nil];
+		[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		return;
 	}
 
-	[_delegate client: self didGenerateSecret: [NSString stringWithFormat: @"%@%@", _secret, _channel]];
+	[_delegate client: self didGenerateSecret: [NSString stringWithFormat: @"%@-%@-%@",
+		[_secret substringToIndex: 4], [_secret substringFromIndex: 4], _channel]];
 
 	// Remember the etag
 	[_etag release];
@@ -427,7 +485,7 @@
 {
 	_party = [[JPAKEParty partyWithPassword: _secret modulusLength: 1024 signerIdentity: @"receiver" peerIdentity: @"sender"] retain];
 	if (_party == nil) {
-		[_delegate client: self didFailWithError: nil];
+		[_delegate client: self didFailWithError: [self errorWithCode: -1 localizedDescriptionKey: @""]]; // TODO: What to report here?
 		return;
 	}
 	
@@ -436,6 +494,7 @@
 
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
+		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
 		[_request setRequestMethod: @"PUT"];
 		[_request setPostBody: [NSMutableData dataWithData: [json dataUsingEncoding: NSUTF8StringEncoding]]];
 		[_request setDelegate: self];
@@ -452,11 +511,9 @@
 	NSLog(@"JPAKEClient#requestChannelDidFinish: %@", request);
 
 	if ([request responseStatusCode] != 200) {
-		[_delegate client: self didFailWithError: nil];
+		[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		return;
 	}
-
-	NSLog(@"Value is %@", request.responseString);
 
 	_channel = [[request.responseString substringWithRange: NSMakeRange(1, [request.responseString length] - 2)] retain];
 	_secret = [[NSString stringWithJPAKESecret] retain];
@@ -481,6 +538,7 @@
 
 	_request = [[ASIHTTPRequest requestWithURL: url] retain];
 	if (_request != nil) {
+		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
 		[_request setDelegate: self];
 		[_request setDidFinishSelector: @selector(requestChannelDidFinish:)];
 		[_request setDidFailSelector: @selector(requestChannelDidFail:)];

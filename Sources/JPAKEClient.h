@@ -15,8 +15,13 @@
 
 @interface NSString (JPAKE)
 + (NSString*) stringWithJPAKESecret;
++ (NSString*) stringWithJPAKEClientIdentifier;
 @end
 
+enum {
+	kJPAKEClientErrorUnexpectedServerResponse = 1,
+	kJPAKEClientErrorInvalidServerResponse
+};
 
 @interface JPAKEClient : NSObject {
   @private
@@ -27,6 +32,7 @@
 	NSTimer* _timer;
 	NSString* _channel;
 	NSString* _secret;
+	NSString* _clientIdentifier;
 	JPAKEParty* _party;
 	NSString* _etag;
 	NSData* _key;
