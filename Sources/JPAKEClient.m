@@ -79,6 +79,10 @@
 	return secret;
 }
 
+/**
+ * Generate a session id, which currently is 256 random characters. Using hex here.
+ */
+
 + (NSString*) stringWithJPAKEClientIdentifier
 {
 	NSMutableString* identifier = [NSMutableString stringWithCapacity: 16];
@@ -94,12 +98,10 @@
 
 @end
 
-@implementation JPAKEClient (Private)
-
-@end
-
-
 @implementation JPAKEClient
+
+@synthesize pollRetries = _pollRetries;
+@synthesize pollInterval = _pollInterval;
 
 - (id) initWithServer: (NSURL*) server delegate: (id<JPAKEClientDelegate>) delegate
 {
@@ -107,6 +109,8 @@
 		_server = [server retain];
 		_delegate = delegate;
 		_clientIdentifier = [[NSString stringWithJPAKEClientIdentifier] retain];
+		_pollRetries = 60;
+		_pollInterval = 1000;
 	}
 	
 	return self;
@@ -143,6 +147,12 @@
 {
 	return [self errorWithCode: kJPAKEClientErrorInvalidServerResponse
 		localizedDescriptionKey: @"The server returned an invalid response"];
+}
+
+- (NSError*) timeoutError
+{
+	return [self errorWithCode: kJPAKEClientErrorPeerTimeout
+		localizedDescriptionKey: @"Timeout while waiting for the peer response"];
 }
 
 #pragma mark -
@@ -230,7 +240,7 @@
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
 		[_request setRequestMethod: @"DELETE"];
-		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
+		[_request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[_request setDelegate: self];
 		[_request setDidFinishSelector: @selector(deleteChannelDidFinish:)];
 		[_request setDidFailSelector: @selector(deleteChannelDidFail:)];
@@ -244,10 +254,17 @@
 {
 	NSLog(@"JPAKEClient#getDesktopMessageThreeDidFinish: %@", request);
 
+	[_timer release];
+	_timer = nil;
+
 	switch ([request responseStatusCode]) {
 		case 304: {
-			[_timer release];
-			_timer = [[NSTimer scheduledTimerWithTimeInterval: 5.0 target: self selector: @selector(getDesktopMessageThree) userInfo: nil repeats: NO] retain];
+			if (_pollRetryCount < _pollRetries) {
+				_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0 target: self
+					selector: @selector(getDesktopMessageThree) userInfo: nil repeats: NO] retain];
+			} else {
+				[_delegate client: self didFailWithError: [self timeoutError]];
+			}
 			break;
 		}
 		
@@ -255,15 +272,15 @@
 			NSDictionary* message = [[request responseString] JSONValue];
 			if ([self validateDesktopMessageThree: message] == NO) {
 				[_delegate client: self didFailWithError: [self invalidServerResponseError]];
-				return;
+			} else {
+				NSLog(@"   Message is %@", message);
+				NSDictionary* payload = [message objectForKey: @"payload"];
+				NSData* iv = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"IV"]] autorelease];
+				NSData* ct = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"ciphertext"]] autorelease];
+				NSData* plaintext = [[[NSData alloc] initWithAESEncryptedData: ct key: _key iv: iv] autorelease];
+				NSString* json = [[[NSString alloc] initWithData: plaintext encoding: NSUTF8StringEncoding] autorelease];
+				[_delegate client: self didReceivePayload: [json JSONValue]];
 			}
-			NSLog(@"   Message is %@", message);
-			NSDictionary* payload = [message objectForKey: @"payload"];
-			NSData* iv = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"IV"]] autorelease];
-			NSData* ct = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"ciphertext"]] autorelease];
-			NSData* plaintext = [[[NSData alloc] initWithAESEncryptedData: ct key: _key iv: iv] autorelease];
-			NSString* json = [[[NSString alloc] initWithData: plaintext encoding: NSUTF8StringEncoding] autorelease];
-			[_delegate client: self didReceivePayload: [json JSONValue]];
 			break;
 		}
 		
@@ -285,7 +302,7 @@
 	
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
-		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
+		[_request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[_request addRequestHeader: @"If-None-Match" value: _etag];
 		[_request setDelegate: self];
 		[_request setDidFinishSelector: @selector(getDesktopMessageThreeDidFinish:)];
@@ -310,7 +327,9 @@
 	_etag = [[[request responseHeaders] objectForKey: @"Etag"] retain];
 
 	// Poll for the desktop's message three
-	_timer = [[NSTimer scheduledTimerWithTimeInterval: 3.0 target: self selector: @selector(getDesktopMessageThree) userInfo: nil repeats: NO] retain];
+	_pollRetryCount = 0;
+	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+		target: self selector: @selector(getDesktopMessageThree) userInfo: nil repeats: NO] retain];
 }
 
 - (void) putMobileMessageThreeDidFail: (ASIHTTPRequest*) request
@@ -332,7 +351,7 @@
 
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
-		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
+		[_request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[_request setRequestMethod: @"PUT"];
 		[_request setPostBody: data];
 		[_request setDelegate: self];
@@ -348,10 +367,17 @@
 {
 	NSLog(@"JPAKEClient#getDesktopMessageTwoDidFinish: %@", request);
 	
+	[_timer release];
+	_timer = nil;
+
 	switch ([request responseStatusCode]) {
 		case 304: {
-			[_timer release];
-			_timer = [[NSTimer scheduledTimerWithTimeInterval: 5.0 target: self selector: @selector(getDesktopMessageTwo) userInfo: nil repeats: NO] retain];
+			if (_pollRetryCount < _pollRetries) {
+				_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+					target: self selector: @selector(getDesktopMessageTwo) userInfo: nil repeats: NO] retain];
+			} else {
+				[_delegate client: self didFailWithError: [self timeoutError]];
+			}
 			break;
 		}
 		
@@ -365,9 +391,9 @@
 			_key = [[_party generateKeyFromMessageTwo: payload] retain];
 			if (_key == nil) {
 				[_delegate client: self didFailWithError: [self errorWithCode: -1 localizedDescriptionKey: @""]]; // TODO: What to report here?
-				return;
+			} else {
+				[self putMobileMessageThree];
 			}
-			[self putMobileMessageThree];
 			break;
 		}
 		
@@ -387,7 +413,7 @@
 {
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
-		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
+		[_request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[_request setDelegate: self];
 		[_request addRequestHeader: @"If-None-Match" value: _etag];
 		[_request setDidFinishSelector: @selector(getDesktopMessageTwoDidFinish:)];
@@ -412,7 +438,9 @@
 	_etag = [[[request responseHeaders] objectForKey: @"Etag"] retain];
 
 	// Poll for the desktop's message two
-	_timer = [[NSTimer scheduledTimerWithTimeInterval: 3.0 target: self selector: @selector(getDesktopMessageTwo) userInfo: nil repeats: NO] retain];
+	_pollRetryCount = 0;
+	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+		target: self selector: @selector(getDesktopMessageTwo) userInfo: nil repeats: NO] retain];
 }
 
 - (void) putMobileMessageTwoDidFail: (ASIHTTPRequest*) request
@@ -428,7 +456,7 @@
 
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
-		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
+		[_request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[_request setRequestMethod: @"PUT"];
 		[_request setPostBody: [NSMutableData dataWithData: [json dataUsingEncoding: NSUTF8StringEncoding]]];
 		[_request setDelegate: self];
@@ -444,10 +472,17 @@
 {
 	NSLog(@"JPAKEClient#getDesktopMessageOneDidFinish: %@", request);
 	
+	[_timer release];
+	_timer = nil;
+
 	switch ([request responseStatusCode]) {
 		case 304: {
-			[_timer release];
-			_timer = [[NSTimer scheduledTimerWithTimeInterval: 5.0 target: self selector: @selector(getDesktopMessageOne) userInfo: nil repeats: NO] retain];
+			if (_pollRetryCount < _pollRetries) {
+				_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+					target: self selector: @selector(getDesktopMessageOne) userInfo: nil repeats: NO] retain];
+			} else {
+				[_delegate client: self didFailWithError: [self timeoutError]];
+			}
 			break;
 		}
 		
@@ -455,10 +490,10 @@
 			NSDictionary* message = [[request responseString] JSONValue];
 			if ([self validateDesktopMessageOne: message] == NO) {
 				[_delegate client: self didFailWithError: [self invalidServerResponseError]];
-				return;
+			} else {
+				NSDictionary* payload = [message objectForKey: @"payload"];
+				[self putMobileMessageTwo: payload];
 			}
-			NSDictionary* payload = [message objectForKey: @"payload"];
-			[self putMobileMessageTwo: payload];
 			break;
 		}
 		
@@ -478,13 +513,14 @@
 {
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
-		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
+		[_request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[_request setDelegate: self];
 		[_request addRequestHeader: @"If-None-Match" value: _etag];
 		[_request setDidFinishSelector: @selector(getDesktopMessageOneDidFinish:)];
 		[_request setDidFailSelector: @selector(getDesktopMessageOneDidFail:)];
 		[_request startAsynchronous];
 	}
+	_pollRetryCount++;
 }
 
 #pragma mark -
@@ -506,7 +542,9 @@
 	_etag = [[[request responseHeaders] objectForKey: @"Etag"] retain];
 	
 	// We have generated a secret and uploaded our message one. So now periodically poll to see if the other side has uploaded their message one.
-	_timer = [[NSTimer scheduledTimerWithTimeInterval: 5.0 target: self selector: @selector(getDesktopMessageOne) userInfo: nil repeats: NO] retain];
+	_pollRetryCount = 0;
+	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+		target: self selector: @selector(getDesktopMessageOne) userInfo: nil repeats: NO] retain];
 }
 
 - (void) putMessageOneDidFail: (ASIHTTPRequest*) request
@@ -528,7 +566,7 @@
 
 	_request = [[ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]] retain];
 	if (_request != nil) {
-		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
+		[_request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[_request setRequestMethod: @"PUT"];
 		[_request setPostBody: [NSMutableData dataWithData: [json dataUsingEncoding: NSUTF8StringEncoding]]];
 		[_request setDelegate: self];
@@ -572,7 +610,7 @@
 
 	_request = [[ASIHTTPRequest requestWithURL: url] retain];
 	if (_request != nil) {
-		[_request addRequestHeader: @"X-Weave-ClientID" value: _clientIdentifier];
+		[_request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[_request setDelegate: self];
 		[_request setDidFinishSelector: @selector(requestChannelDidFinish:)];
 		[_request setDidFailSelector: @selector(requestChannelDidFail:)];

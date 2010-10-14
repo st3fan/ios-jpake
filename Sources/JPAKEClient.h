@@ -54,7 +54,8 @@
 
 enum {
 	kJPAKEClientErrorUnexpectedServerResponse = 1,
-	kJPAKEClientErrorInvalidServerResponse
+	kJPAKEClientErrorInvalidServerResponse,
+	kJPAKEClientErrorPeerTimeout
 };
 
 @interface JPAKEClient : NSObject {
@@ -63,6 +64,7 @@ enum {
 	id<JPAKEClientDelegate> _delegate;
   @private
 	ASIHTTPRequest* _request;
+	NSUInteger _pollRetryCount;
 	NSTimer* _timer;
 	NSString* _channel;
 	NSString* _secret;
@@ -70,7 +72,21 @@ enum {
 	JPAKEParty* _party;
 	NSString* _etag;
 	NSData* _key;
+	NSUInteger _pollRetries;
+	NSUInteger _pollInterval;
 }
+
+/**
+ * The number of retries while polling for the next message. Default 60.
+ */
+
+@property (nonatomic,assign) NSUInteger pollRetries;
+
+/**
+ * The interval in milliseconds between polls for the next message. Default 1 second.
+ */
+
+@property (nonatomic,assign) NSUInteger pollInterval;
 
 - (id) initWithServer: (NSURL*) server delegate: (id<JPAKEClientDelegate>) delegate;
 
