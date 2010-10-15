@@ -185,18 +185,48 @@
 		return NO;
 	}
 	
+	// Check for the existence of a payload dictionary
+	
 	NSDictionary* payload = [message objectForKey: @"payload"];
 	if (payload == nil || [payload isKindOfClass: [NSDictionary class]] == NO) {
 		return NO;
 	}
 	
-	NSDictionary* zkp_x1 = [payload objectForKey: @"zkp_x1"];	
+	// Check if the payload has the two zkp dictionaries
+	
+	NSDictionary* zkp_x1 = [payload objectForKey: @"zkp_x1"];
 	if (zkp_x1 == nil || [zkp_x1 isKindOfClass: [NSDictionary class]] == NO) {
 		return NO;
 	}
-	
-	NSDictionary* zkp_x2 = [payload objectForKey: @"zkp_x2"];
+
+	NSDictionary* zkp_x2 = [payload objectForKey: @"zkp_x1"];
 	if (zkp_x2 == nil || [zkp_x2 isKindOfClass: [NSDictionary class]] == NO) {
+		return NO;
+	}
+	
+	// Check for the presence of the numbers .. we just check if they are strings
+
+	if ([[payload objectForKey: @"gx1"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}
+
+	if ([[payload objectForKey: @"gx2"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}
+
+	if ([[zkp_x1 objectForKey: @"gr"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}
+
+	if ([[zkp_x1 objectForKey: @"b"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}
+
+	if ([[zkp_x2 objectForKey: @"gr"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}
+
+	if ([[zkp_x2 objectForKey: @"b"] isKindOfClass: [NSString class]] == NO) {
 		return NO;
 	}
 	
@@ -209,6 +239,34 @@
 		return NO;
 	}
 
+	// Check for the existence of a payload dictionary
+	
+	NSDictionary* payload = [message objectForKey: @"payload"];
+	if (payload == nil || [payload isKindOfClass: [NSDictionary class]] == NO) {
+		return NO;
+	}
+	
+	// Check if the payload has the zkp dictionary
+	
+	NSDictionary* zkp_A = [payload objectForKey: @"zkp_A"];	
+	if (zkp_A == nil || [zkp_A isKindOfClass: [NSDictionary class]] == NO) {
+		return NO;
+	}
+	
+	// Check for the presence of the numbers .. we just check if they are strings
+
+	if ([[payload objectForKey: @"A"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}
+
+	if ([[zkp_A objectForKey: @"gr"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}
+
+	if ([[zkp_A objectForKey: @"b"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}
+
 	return YES;
 }
 
@@ -217,6 +275,27 @@
 	if ([self validateBasicMessage: message ofType: @"sender3"] == NO) {
 		return NO;
 	}
+	
+	// Check for the existence of a payload dictionary
+	
+	NSDictionary* payload = [message objectForKey: @"payload"];
+	if (payload == nil || [payload isKindOfClass: [NSDictionary class]] == NO) {
+		return NO;
+	}
+
+	// Check if the crypto fields are there
+	
+	if ([[payload objectForKey: @"ciphertext"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}	
+
+	if ([[payload objectForKey: @"IV"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}	
+
+	if ([[payload objectForKey: @"hmac"] isKindOfClass: [NSString class]] == NO) {
+		return NO;
+	}	
 
 	return YES;
 }
