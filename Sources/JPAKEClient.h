@@ -55,7 +55,8 @@
 enum {
 	kJPAKEClientErrorUnexpectedServerResponse = 1,
 	kJPAKEClientErrorInvalidServerResponse,
-	kJPAKEClientErrorPeerTimeout
+	kJPAKEClientErrorPeerTimeout,
+	kJPAKEClientErrorInvalidCryptoPayload
 };
 
 @interface JPAKEClient : NSObject {

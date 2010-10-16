@@ -329,6 +329,47 @@
 
 #pragma mark -
 
+- (NSString*) decryptPayload: (NSDictionary*) payload withKey: (NSData*) key error: (NSError**) error
+{
+	NSData* iv = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"IV"]] autorelease];
+	if (iv == nil || [iv length] != 16) {
+		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		return nil;
+	}
+	
+	NSData* ciphertext = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"ciphertext"]] autorelease];
+	if (ciphertext == nil || [ciphertext length] == 0) {
+		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		return nil;
+	}
+	
+	NSData* hmac = [[[NSData alloc] initWithBase16EncodedString: [payload objectForKey: @"hmac"]] autorelease];
+	if (hmac == nil || [hmac length] != 32) {
+		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		return nil;
+	}
+
+	NSData* hmacValue = [ciphertext HMACSHA256WithKey: key];
+	if (hmacValue == nil || [hmac isEqualToData: hmacValue] == NO) {
+		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		return nil;
+	}
+	
+	NSData* plaintext = [[[NSData alloc] initWithAESEncryptedData: ciphertext key: _key iv: iv] autorelease];
+	if (plaintext == nil) {
+		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		return nil;
+	}
+
+	NSString* json = [[[NSString alloc] initWithData: plaintext encoding: NSUTF8StringEncoding] autorelease];
+	if (json == nil) {
+		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		return nil;
+	}
+	
+	return json;
+}
+
 - (void) getDesktopMessageThreeDidFinish: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#getDesktopMessageThreeDidFinish: %@", request);
@@ -352,13 +393,13 @@
 			if ([self validateDesktopMessageThree: message] == NO) {
 				[_delegate client: self didFailWithError: [self invalidServerResponseError]];
 			} else {
-				NSLog(@"   Message is %@", message);
-				NSDictionary* payload = [message objectForKey: @"payload"];
-				NSData* iv = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"IV"]] autorelease];
-				NSData* ct = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"ciphertext"]] autorelease];
-				NSData* plaintext = [[[NSData alloc] initWithAESEncryptedData: ct key: _key iv: iv] autorelease];
-				NSString* json = [[[NSString alloc] initWithData: plaintext encoding: NSUTF8StringEncoding] autorelease];
-				[_delegate client: self didReceivePayload: [json JSONValue]];
+				NSError* error = nil;
+				NSString* json = [self decryptPayload: [message objectForKey: @"payload"] withKey: _key error: &error];
+				if (error != nil) {
+					[_delegate client: self didFailWithError: error];
+				} else {
+					[_delegate client: self didReceivePayload: [json JSONValue]];
+				}
 			}
 			break;
 		}
