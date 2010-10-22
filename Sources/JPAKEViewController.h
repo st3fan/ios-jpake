@@ -47,7 +47,9 @@
 
 @interface JPAKEViewController : UIViewController <JPAKEClientDelegate> {
   @private
-	UILabel* _passwordLabel;
+	UILabel* _passwordLabel1;
+	UILabel* _passwordLabel2;
+	UILabel* _passwordLabel3;
 	UILabel* _statusLabel;
   @private
     NSURL* _server;
@@ -56,7 +58,9 @@
 	JPAKEClient* _client;
 }
 
-@property (nonatomic,assign) IBOutlet UILabel* passwordLabel;
+@property (nonatomic,assign) IBOutlet UILabel* passwordLabel1;
+@property (nonatomic,assign) IBOutlet UILabel* passwordLabel2;
+@property (nonatomic,assign) IBOutlet UILabel* passwordLabel3;
 @property (nonatomic,assign) IBOutlet UILabel* statusLabel;
 
 @property (nonatomic,retain) NSURL* server;

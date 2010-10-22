@@ -39,7 +39,9 @@
 @implementation JPAKEViewController
 
 @synthesize statusLabel = _statusLabel;
-@synthesize passwordLabel = _passwordLabel;
+@synthesize passwordLabel1 = _passwordLabel1;
+@synthesize passwordLabel2 = _passwordLabel2;
+@synthesize passwordLabel3 = _passwordLabel3;
 
 @synthesize server = _server;
 @synthesize delegate = _delegate;
@@ -61,7 +63,10 @@
 
 - (void) client: (JPAKEClient*) client didGenerateSecret: (NSString*) secret
 {
-	_passwordLabel.text = secret;
+	NSArray* components = [secret componentsSeparatedByString: @"-"];
+	_passwordLabel1.text = [components objectAtIndex: 0];
+	_passwordLabel2.text = [components objectAtIndex: 1];
+	_passwordLabel3.text = [components objectAtIndex: 2];
 }
 
 - (void) client: (JPAKEClient*) client didFailWithError: (NSError*) error
