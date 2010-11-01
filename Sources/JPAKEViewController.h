@@ -43,6 +43,7 @@
 @protocol JPAKEViewControllerDelegate
 - (void) JPAKEViewController: (JPAKEViewController*) vc didFinishWithMessage: (id) message;
 - (void) JPAKEViewController: (JPAKEViewController*) vc didFailWithError: (NSError*) error;
+- (void) JPAKEViewControllerDidCancel: (JPAKEViewController*) vc;
 @end
 
 @interface JPAKEViewController : UIViewController <JPAKEClientDelegate> {

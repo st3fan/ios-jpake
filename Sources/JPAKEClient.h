@@ -45,6 +45,7 @@
 - (void) client: (JPAKEClient*) client didGenerateSecret: (NSString*) secret;
 - (void) client: (JPAKEClient*) client didFailWithError: (NSError*) error;
 - (void) client: (JPAKEClient*) client didReceivePayload: (id) payload;
+- (void) clientDidCancel: (JPAKEClient*) client;
 @end
 
 @interface NSString (JPAKE)

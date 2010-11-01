@@ -749,6 +749,19 @@
 
 - (void) cancel
 {
+	if (_request != nil) {
+		[_request cancel];
+		[_request release];
+		_request = nil;
+	}
+
+	if (_timer != nil) {
+		[_timer invalidate];
+		[_timer release];
+		_timer = nil;
+	}
+	
+	[_delegate clientDidCancel: self];
 }
 
 @end

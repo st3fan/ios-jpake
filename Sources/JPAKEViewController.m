@@ -79,4 +79,9 @@
 	[_delegate JPAKEViewController: self didFinishWithMessage: payload];
 }
 
+- (void) clientDidCancel: (JPAKEClient*) client
+{
+	[_delegate JPAKEViewControllerDidCancel: self];
+}
+
 @end
