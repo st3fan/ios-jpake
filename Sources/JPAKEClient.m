@@ -118,7 +118,26 @@
 
 - (void) dealloc
 {
+	if (_request != nil) {
+		[_request cancel];
+		[_request release];
+		_request = nil;
+	}
+
+	if (_timer != nil) {
+		[_timer invalidate];
+		[_timer release];
+		_timer = nil;
+	}
+
+	[_channel release];
+	[_secret release];
+	[_clientIdentifier release];
+	[_party release];
+	[_etag release];
+	[_key release];
 	[_server release];
+
 	[super dealloc];
 }
 
@@ -305,11 +324,17 @@
 - (void) deleteChannelDidFinish: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#deleteChannelDidFinish");
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) deleteChannelDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#deleteChannelDidFail");
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) deleteChannel
@@ -331,6 +356,18 @@
 
 - (NSString*) decryptPayload: (NSDictionary*) payload withKey: (NSData*) key error: (NSError**) error
 {
+	// Generate the two different keys for HMAC-SHA256 and AES
+	
+	NSMutableData* hmacKeyData = [NSMutableData dataWithData: [@"hmac:" dataUsingEncoding: NSASCIIStringEncoding]];
+	[hmacKeyData appendData: _key];
+	NSData* hmacKey = [hmacKeyData SHA256Hash];
+
+	NSMutableData* cryptoKeyData = [NSMutableData dataWithData: [@"encrypt:" dataUsingEncoding: NSASCIIStringEncoding]];
+	[cryptoKeyData appendData: _key];
+	NSData* cryptoKey = [cryptoKeyData SHA256Hash];
+
+	//
+
 	NSData* iv = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"IV"]] autorelease];
 	if (iv == nil || [iv length] != 16) {
 		if (error != NULL) {
@@ -357,7 +394,7 @@
 
 	NSData* cipherTextData = [[payload objectForKey: @"ciphertext"] dataUsingEncoding: NSASCIIStringEncoding];
 
-	NSData* hmacValue = [cipherTextData HMACSHA256WithKey: key];
+	NSData* hmacValue = [cipherTextData HMACSHA256WithKey: hmacKey];
 	if (hmacValue == nil || [hmac isEqualToData: hmacValue] == NO) {
 		if (error != NULL) {
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
@@ -365,7 +402,7 @@
 		return nil;
 	}
 	
-	NSData* plaintext = [[[NSData alloc] initWithAESEncryptedData: ciphertext key: _key iv: iv] autorelease];
+	NSData* plaintext = [[[NSData alloc] initWithAESEncryptedData: ciphertext key: cryptoKey iv: iv] autorelease];
 	if (plaintext == nil) {
 		if (error != NULL) {
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
@@ -422,12 +459,18 @@
 			[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		}
 	}
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) getDesktopMessageThreeDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#getDesktopMessageThreeDidFail: %@", request);
 	[_delegate client: self didFailWithError: [request error]];
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) getDesktopMessageThree
@@ -460,6 +503,9 @@
 	[_etag release];
 	_etag = [[[request responseHeaders] objectForKey: @"Etag"] retain];
 
+	[_request release];
+	_request = nil;
+
 	// Poll for the desktop's message three
 	_pollRetryCount = 0;
 	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
@@ -470,6 +516,9 @@
 {
 	NSLog(@"JPAKEClient#putMobileMessageThreeDidFail: %@", request);
 	[_delegate client: self didFailWithError: [request error]];
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) putMobileMessageThree
@@ -535,12 +584,18 @@
 			[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		}
 	}
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) getDesktopMessageTwoDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#getDesktopMessageTwoDidFail: %@", request);
 	[_delegate client: self didFailWithError: [request error]];
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) getDesktopMessageTwo
@@ -570,6 +625,9 @@
 	// Remember the etag
 	[_etag release];
 	_etag = [[[request responseHeaders] objectForKey: @"Etag"] retain];
+
+	[_request release];
+	_request = nil;
 
 	// Poll for the desktop's message two
 	_pollRetryCount = 0;
@@ -635,12 +693,18 @@
 			[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		}
 	}
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) getDesktopMessageOneDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#getDesktopMessageOneDidFail: %@", request);
 	[_delegate client: self didFailWithError: [request error]];
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) getDesktopMessageOne
@@ -674,6 +738,9 @@
 	// Remember the etag
 	[_etag release];
 	_etag = [[[request responseHeaders] objectForKey: @"Etag"] retain];
+
+	[_request release];
+	_request = nil;
 	
 	// We have generated a secret and uploaded our message one. So now periodically poll to see if the other side has uploaded their message one.
 	_pollRetryCount = 0;
@@ -685,6 +752,9 @@
 {
 	NSLog(@"JPAKEClient#putMessageOneDidFail: %@", request);
 	[_delegate client: self didFailWithError: [request error]];
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) putMessageOne
@@ -736,6 +806,9 @@
 {
 	NSLog(@"JPAKEClient#requestChannelDidFail: %@", request);
 	[_delegate client: self didFailWithError: [request error]];
+
+	[_request release];
+	_request = nil;
 }
 
 - (void) requestChannel
@@ -772,7 +845,7 @@
 		[_timer release];
 		_timer = nil;
 	}
-	
+
 	[_delegate clientDidCancel: self];
 }
 
