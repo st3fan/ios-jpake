@@ -333,19 +333,25 @@
 {
 	NSData* iv = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"IV"]] autorelease];
 	if (iv == nil || [iv length] != 16) {
-		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		if (error != NULL) {
+			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		}
 		return nil;
 	}
 	
 	NSData* ciphertext = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"ciphertext"]] autorelease];
 	if (ciphertext == nil || [ciphertext length] == 0) {
-		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		if (error != NULL) {
+			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		}
 		return nil;
 	}
 	
 	NSData* hmac = [[[NSData alloc] initWithBase16EncodedString: [payload objectForKey: @"hmac"]] autorelease];
 	if (hmac == nil || [hmac length] != 32) {
-		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		if (error != NULL) {
+			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		}
 		return nil;
 	}
 
@@ -353,19 +359,25 @@
 
 	NSData* hmacValue = [cipherTextData HMACSHA256WithKey: key];
 	if (hmacValue == nil || [hmac isEqualToData: hmacValue] == NO) {
-		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		if (error != NULL) {
+			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		}
 		return nil;
 	}
 	
 	NSData* plaintext = [[[NSData alloc] initWithAESEncryptedData: ciphertext key: _key iv: iv] autorelease];
 	if (plaintext == nil) {
-		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		if (error != NULL) {
+			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		}
 		return nil;
 	}
 
 	NSString* json = [[[NSString alloc] initWithData: plaintext encoding: NSUTF8StringEncoding] autorelease];
 	if (json == nil) {
-		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		if (error != NULL) {
+			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
+		}
 		return nil;
 	}
 	
