@@ -349,7 +349,9 @@
 		return nil;
 	}
 
-	NSData* hmacValue = [ciphertext HMACSHA256WithKey: key];
+	NSData* cipherTextData = [[payload objectForKey: @"ciphertext"] dataUsingEncoding: NSASCIIStringEncoding];
+
+	NSData* hmacValue = [cipherTextData HMACSHA256WithKey: key];
 	if (hmacValue == nil || [hmac isEqualToData: hmacValue] == NO) {
 		*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
 		return nil;
