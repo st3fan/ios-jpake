@@ -38,8 +38,10 @@
 
 #import "JPAKEParty.h"
 #import "ASIHTTPRequest.h"
+#import "ASINetworkQueue.h"
 
 @class JPAKEClient;
+@class JPAKEReporter;
 
 @protocol JPAKEClientDelegate
 - (void) client: (JPAKEClient*) client didGenerateSecret: (NSString*) secret;
@@ -64,6 +66,7 @@ enum {
   @private
 	NSURL* _server;
 	id<JPAKEClientDelegate> _delegate;
+	JPAKEReporter* _reporter;
   @private
 	ASIHTTPRequest* _request;
 	NSUInteger _pollRetryCount;
@@ -76,6 +79,7 @@ enum {
 	NSData* _key;
 	NSUInteger _pollRetries;
 	NSUInteger _pollInterval;
+	ASINetworkQueue* _queue;
 }
 
 /**
@@ -90,7 +94,7 @@ enum {
 
 @property (nonatomic,assign) NSUInteger pollInterval;
 
-- (id) initWithServer: (NSURL*) server delegate: (id<JPAKEClientDelegate>) delegate;
+- (id) initWithServer: (NSURL*) server delegate: (id<JPAKEClientDelegate>) delegate reporter: (JPAKEReporter*) reporter;
 
 - (void) start;
 - (void) cancel;

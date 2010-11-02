@@ -45,10 +45,11 @@
 
 @synthesize server = _server;
 @synthesize delegate = _delegate;
+@synthesize reporter = _reporter;
 
 - (void) viewDidLoad
 {
-	_client = [[JPAKEClient alloc] initWithServer: _server delegate: self];
+	_client = [[JPAKEClient alloc] initWithServer: _server delegate: self reporter: _reporter];
 	[_client start];
 }
 

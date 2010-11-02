@@ -39,6 +39,7 @@
 #import "JPAKEClient.h"
 
 @class JPAKEViewController;
+@class JPAKEReporter;
 
 @protocol JPAKEViewControllerDelegate
 - (void) JPAKEViewController: (JPAKEViewController*) vc didFinishWithMessage: (id) message;
@@ -55,6 +56,7 @@
   @private
     NSURL* _server;
 	id<JPAKEViewControllerDelegate> _delegate;
+	JPAKEReporter* _reporter;
   @private
 	JPAKEClient* _client;
 }
@@ -66,6 +68,7 @@
 
 @property (nonatomic,retain) NSURL* server;
 @property (nonatomic,assign) id<JPAKEViewControllerDelegate> delegate;
+@property (nonatomic,retain) JPAKEReporter* reporter;
 
 - (IBAction) cancel;
 
