@@ -11,14 +11,16 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is Weave.
+ * The Original Code is Firefox Home.
  *
- * The Initial Developer of the Original Code is
- * the Mozilla Foundation.
+ * The Initial Developer of the Original Code is the Mozilla Foundation.
+ *
  * Portions created by the Initial Developer are Copyright (C) 2010
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
+ *
+ *  Stefan Arentz <stefan@arentz.ca>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -33,18 +35,6 @@
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
-
-// TODO:
-//
-//    Comments
-//    keep _request around
-//    implement cancel
-//    clean up properly
-//    better validation of messages
-//    better handling of failure
-//    error codes
-//    delegate method that updates progress
-//
 
 #import "NSData+AES.h"
 #import "NSData+Base64.h"
@@ -399,7 +389,7 @@
 		return nil;
 	}
 	
-	NSData* plaintext = [[[NSData alloc] initWithAESEncryptedData: ciphertext key: cryptoKey iv: iv] autorelease];
+	NSData* plaintext = [[NSData dataWithAESEncryptedData: ciphertext key: cryptoKey iv: iv] autorelease];
 	if (plaintext == nil) {
 		if (error != NULL) {
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
