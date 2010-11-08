@@ -37,8 +37,8 @@
  * ***** END LICENSE BLOCK ***** */
 
 #import "NSData+AES.h"
-#import "NSData+Base64.h"
-#import "NSData+SHA256.h"
+#import "NSData+Encoding.h"
+#import "NSData+SHA.h"
 
 #import "JPAKEClient.h"
 #import "JSON.h"
