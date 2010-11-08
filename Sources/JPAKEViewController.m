@@ -55,6 +55,14 @@
 	[_client start];
 }
 
+- (void) dealloc
+{
+	[_client release];
+	[_server release];
+	[_reporter release];
+	[super dealloc];
+}
+
 #pragma mark -
 
 - (IBAction) cancel
