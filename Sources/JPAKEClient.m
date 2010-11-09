@@ -389,7 +389,7 @@
 		return nil;
 	}
 	
-	NSData* plaintext = [[NSData dataWithAESEncryptedData: ciphertext key: cryptoKey iv: iv] autorelease];
+	NSData* plaintext = [NSData plaintextDataByAES256DecryptingCiphertextData: ciphertext key: cryptoKey iv: iv];
 	if (plaintext == nil) {
 		if (error != NULL) {
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
