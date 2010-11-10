@@ -710,7 +710,7 @@
 
 - (void) putMessageOne
 {
-	_party = [[JPAKEParty partyWithPassword: _secret modulusLength: 1024 signerIdentity: @"receiver" peerIdentity: @"sender"] retain];
+	_party = [[JPAKEParty partyWithPassword: _secret modulusLength: 3072 signerIdentity: @"receiver" peerIdentity: @"sender"] retain];
 	if (_party == nil) {
 		[_delegate client: self didFailWithError: [self errorWithCode: -1 localizedDescriptionKey: @""]]; // TODO: What to report here?
 		return;
