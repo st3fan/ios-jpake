@@ -774,6 +774,7 @@
 
 - (void) start
 {
+	[ASIHTTPRequest setShouldUpdateNetworkActivityIndicator:NO];
 	[self requestChannel];
 }
 
