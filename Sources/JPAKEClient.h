@@ -70,7 +70,6 @@ enum {
 	id<JPAKEClientDelegate> _delegate;
 	JPAKEReporter* _reporter;
   @private
-	ASIHTTPRequest* _request;
 	NSUInteger _pollRetryCount;
 	NSTimer* _timer;
 	NSString* _channel;
