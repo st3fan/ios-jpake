@@ -51,19 +51,16 @@
 
 + (NSString*) stringWithJPAKESecret
 {
-	NSMutableString* secret = [NSMutableString stringWithCapacity: 4];
-	
+	static char* permittedCharacters = "abcdefghijkmnpqrstuvwxyz23456789";
+
+	NSMutableString* secret = [NSMutableString stringWithCapacity: 8];
+		
 	srandomdev();
+
+	int n = strlen(permittedCharacters);
 	
 	for (int i = 0; i < 8; i++) {
-		switch (random() % 2) {
-			case 0:
-				[secret appendFormat: @"%c", '0' + (random() % 10)];
-				break;
-			case 1:
-				[secret appendFormat: @"%c", 'a' + (random() % 26)];
-				break;
-		}
+		[secret appendFormat: @"%c", permittedCharacters[random() % n]];
 	}
 	
 	return secret;
