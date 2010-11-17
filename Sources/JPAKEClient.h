@@ -99,5 +99,6 @@ enum {
 
 - (void) start;
 - (void) cancel;
+- (void) abort;
 
 @end

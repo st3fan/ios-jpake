@@ -791,4 +791,15 @@
 	[_delegate clientDidCancel: self];
 }
 
+- (void) abort
+{
+	[_queue reset];
+	
+	if (_timer != nil) {
+		[_timer invalidate];
+		[_timer release];
+		_timer = nil;
+	}
+}
+
 @end
