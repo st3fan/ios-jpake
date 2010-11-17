@@ -89,6 +89,7 @@
 
 @synthesize pollRetries = _pollRetries;
 @synthesize pollInterval = _pollInterval;
+@synthesize pollDelay = _pollDelay;
 
 - (id) initWithServer: (NSURL*) server delegate: (id<JPAKEClientDelegate>) delegate reporter: (JPAKEReporter*) reporter
 {
@@ -97,11 +98,11 @@
 		_delegate = delegate;
 		_reporter = [reporter retain];
 		_clientIdentifier = [[NSString stringWithJPAKEClientIdentifier] retain];
-		_pollRetries = 60;
+		_pollRetries = 300;
+		_pollDelay = 2000;
 		_pollInterval = 1000;
 		_queue = [ASINetworkQueue new];
 		[_queue go];
-
 	}
 	
 	return self;
@@ -483,7 +484,7 @@
 
 	// Poll for the desktop's message three
 	_pollRetryCount = 0;
-	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollDelay) / 1000.0
 		target: self selector: @selector(getDesktopMessageThree) userInfo: nil repeats: NO] retain];
 }
 
@@ -594,7 +595,7 @@
 
 	// Poll for the desktop's message two
 	_pollRetryCount = 0;
-	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollDelay) / 1000.0
 		target: self selector: @selector(getDesktopMessageTwo) userInfo: nil repeats: NO] retain];
 }
 
@@ -698,7 +699,7 @@
 	
 	// We have generated a secret and uploaded our message one. So now periodically poll to see if the other side has uploaded their message one.
 	_pollRetryCount = 0;
-	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollDelay) / 1000.0
 		target: self selector: @selector(getDesktopMessageOne) userInfo: nil repeats: NO] retain];
 }
 
