@@ -77,6 +77,7 @@
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: url];
 	if (request != nil)
 	{
+		[request setShouldAttemptPersistentConnection: NO];
 		[request setDelegate: self];
 		[request setNumberOfTimesToRetryOnTimeout: 3];
 		[request addRequestHeader: @"X-KeyExchange-Log-Code" value: [NSString stringWithFormat: @"%d", code]];

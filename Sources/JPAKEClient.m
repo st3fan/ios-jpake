@@ -327,6 +327,7 @@
 	
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]];
 	if (request != nil) {
+		[request setShouldAttemptPersistentConnection: NO];
 		[request setRequestMethod: @"DELETE"];
 		[request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[request setDelegate: self];
@@ -457,6 +458,7 @@
 	
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]];
 	if (request != nil) {
+		[request setShouldAttemptPersistentConnection: NO];
 		[request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[request addRequestHeader: @"If-None-Match" value: _etag];
 		[request setDelegate: self];
@@ -506,6 +508,7 @@
 
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]];
 	if (request != nil) {
+		[request setShouldAttemptPersistentConnection: NO];
 		[request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[request setRequestMethod: @"PUT"];
 		[request setPostBody: data];
@@ -568,6 +571,7 @@
 {
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]];
 	if (request != nil) {
+		[request setShouldAttemptPersistentConnection: NO];
 		[request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[request setDelegate: self];
 		[request addRequestHeader: @"If-None-Match" value: _etag];
@@ -611,6 +615,7 @@
 
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]];
 	if (request != nil) {
+		[request setShouldAttemptPersistentConnection: NO];
 		[request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[request setRequestMethod: @"PUT"];
 		[request setPostBody: [NSMutableData dataWithData: [json dataUsingEncoding: NSUTF8StringEncoding]]];
@@ -668,6 +673,7 @@
 {
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]];
 	if (request != nil) {
+		[request setShouldAttemptPersistentConnection: NO];
 		[request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[request setDelegate: self];
 		[request addRequestHeader: @"If-None-Match" value: _etag];
@@ -721,6 +727,7 @@
 
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]];
 	if (request != nil) {
+		[request setShouldAttemptPersistentConnection: NO];
 		[request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[request setRequestMethod: @"PUT"];
 		[request setPostBody: [NSMutableData dataWithData: [json dataUsingEncoding: NSUTF8StringEncoding]]];
@@ -762,6 +769,7 @@
 
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: url];
 	if (request != nil) {
+		[request setShouldAttemptPersistentConnection: NO];
 		[request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
 		[request setDelegate: self];
 		[request setDidFinishSelector: @selector(requestChannelDidFinish:)];
