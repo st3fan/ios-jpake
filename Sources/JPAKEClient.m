@@ -37,8 +37,8 @@
  * ***** END LICENSE BLOCK ***** */
 
 #import "NSData+AES.h"
-#import "NSData+Base64.h"
-#import "NSData+SHA256.h"
+#import "NSData+Encoding.h"
+#import "NSData+SHA.h"
 
 #import "JPAKEClient.h"
 #import "JSON.h"
@@ -51,19 +51,16 @@
 
 + (NSString*) stringWithJPAKESecret
 {
-	NSMutableString* secret = [NSMutableString stringWithCapacity: 4];
-	
+	static char* permittedCharacters = "abcdefghijkmnpqrstuvwxyz23456789";
+
+	NSMutableString* secret = [NSMutableString stringWithCapacity: 8];
+		
 	srandomdev();
+
+	int n = strlen(permittedCharacters);
 	
 	for (int i = 0; i < 8; i++) {
-		switch (random() % 2) {
-			case 0:
-				[secret appendFormat: @"%c", '0' + (random() % 10)];
-				break;
-			case 1:
-				[secret appendFormat: @"%c", 'a' + (random() % 26)];
-				break;
-		}
+		[secret appendFormat: @"%c", permittedCharacters[random() % n]];
 	}
 	
 	return secret;
@@ -92,6 +89,7 @@
 
 @synthesize pollRetries = _pollRetries;
 @synthesize pollInterval = _pollInterval;
+@synthesize pollDelay = _pollDelay;
 
 - (id) initWithServer: (NSURL*) server delegate: (id<JPAKEClientDelegate>) delegate reporter: (JPAKEReporter*) reporter
 {
@@ -100,11 +98,11 @@
 		_delegate = delegate;
 		_reporter = [reporter retain];
 		_clientIdentifier = [[NSString stringWithJPAKEClientIdentifier] retain];
-		_pollRetries = 60;
+		_pollRetries = 300;
+		_pollDelay = 2000;
 		_pollInterval = 1000;
 		_queue = [ASINetworkQueue new];
 		[_queue go];
-
 	}
 	
 	return self;
@@ -389,7 +387,7 @@
 		return nil;
 	}
 	
-	NSData* plaintext = [[NSData dataWithAESEncryptedData: ciphertext key: cryptoKey iv: iv] autorelease];
+	NSData* plaintext = [NSData plaintextDataByAES256DecryptingCiphertextData: ciphertext key: cryptoKey iv: iv];
 	if (plaintext == nil) {
 		if (error != NULL) {
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
@@ -486,7 +484,7 @@
 
 	// Poll for the desktop's message three
 	_pollRetryCount = 0;
-	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollDelay) / 1000.0
 		target: self selector: @selector(getDesktopMessageThree) userInfo: nil repeats: NO] retain];
 }
 
@@ -597,7 +595,7 @@
 
 	// Poll for the desktop's message two
 	_pollRetryCount = 0;
-	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollDelay) / 1000.0
 		target: self selector: @selector(getDesktopMessageTwo) userInfo: nil repeats: NO] retain];
 }
 
@@ -701,7 +699,7 @@
 	
 	// We have generated a secret and uploaded our message one. So now periodically poll to see if the other side has uploaded their message one.
 	_pollRetryCount = 0;
-	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
+	_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollDelay) / 1000.0
 		target: self selector: @selector(getDesktopMessageOne) userInfo: nil repeats: NO] retain];
 }
 
@@ -713,7 +711,7 @@
 
 - (void) putMessageOne
 {
-	_party = [[JPAKEParty partyWithPassword: _secret modulusLength: 1024 signerIdentity: @"receiver" peerIdentity: @"sender"] retain];
+	_party = [[JPAKEParty partyWithPassword: _secret modulusLength: 3072 signerIdentity: @"receiver" peerIdentity: @"sender"] retain];
 	if (_party == nil) {
 		[_delegate client: self didFailWithError: [self errorWithCode: -1 localizedDescriptionKey: @""]]; // TODO: What to report here?
 		return;
@@ -777,6 +775,7 @@
 
 - (void) start
 {
+	[ASIHTTPRequest setShouldUpdateNetworkActivityIndicator:NO];
 	[self requestChannel];
 }
 
@@ -791,6 +790,17 @@
 	}
 
 	[_delegate clientDidCancel: self];
+}
+
+- (void) abort
+{
+	[_queue reset];
+	
+	if (_timer != nil) {
+		[_timer invalidate];
+		[_timer release];
+		_timer = nil;
+	}
 }
 
 @end

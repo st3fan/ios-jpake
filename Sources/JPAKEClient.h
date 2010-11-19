@@ -70,7 +70,6 @@ enum {
 	id<JPAKEClientDelegate> _delegate;
 	JPAKEReporter* _reporter;
   @private
-	ASIHTTPRequest* _request;
 	NSUInteger _pollRetryCount;
 	NSTimer* _timer;
 	NSString* _channel;
@@ -80,15 +79,22 @@ enum {
 	NSString* _etag;
 	NSData* _key;
 	NSUInteger _pollRetries;
+	NSUInteger _pollDelay;
 	NSUInteger _pollInterval;
 	ASINetworkQueue* _queue;
 }
 
 /**
- * The number of retries while polling for the next message. Default 60.
+ * The number of retries while polling for the next message. Default 300 tries.
  */
 
 @property (nonatomic,assign) NSUInteger pollRetries;
+
+/**
+ * The delay between posting something and polling for a response. Default 2 seconds.
+ */
+
+@property (nonatomic,assign) NSUInteger pollDelay;
 
 /**
  * The interval in milliseconds between polls for the next message. Default 1 second.
@@ -100,5 +106,6 @@ enum {
 
 - (void) start;
 - (void) cancel;
+- (void) abort;
 
 @end
