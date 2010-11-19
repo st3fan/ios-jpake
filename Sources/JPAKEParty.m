@@ -37,6 +37,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #import "JPAKEParty.h"
 
 /**
@@ -335,17 +336,19 @@ static BIGNUM* HashPassword(NSString* password, BIGNUM* q)
 				const EVP_MD* md = EVP_get_digestbyname("SHA256");
 				if (md != NULL)
 				{
-					unsigned char md_value[EVP_MAX_MD_SIZE];
-					unsigned int md_len;	
-					EVP_MD_CTX mdctx;
-
-					EVP_MD_CTX_init(&mdctx);
-					EVP_DigestInit_ex(&mdctx, md, NULL);
-					EVP_DigestUpdate(&mdctx, [keyData bytes], [keyData length]);
-					EVP_DigestFinal_ex(&mdctx, md_value, &md_len);
-					EVP_MD_CTX_cleanup(&mdctx);
+					unsigned char hmac_value[EVP_MAX_MD_SIZE];
+					unsigned int hmac_length;
 					
-					result = [NSData dataWithBytes: md_value length: md_len];
+					static unsigned char extraction_key[32] = {
+						0x83, 0x5b, 0x86, 0x9f, 0x96, 0xfa, 0x3b, 0x50,
+						0xe6, 0xb5, 0x62, 0x0c, 0x41, 0xca, 0xb1, 0x3a,
+						0x47, 0x7c, 0x76, 0x60, 0x36, 0x95, 0xaa, 0xda,
+						0xde, 0xc4, 0x57, 0x09, 0xc2, 0x6b, 0x09, 0x38
+					};
+				
+					if (HMAC(md, extraction_key, sizeof extraction_key, (const void*) [keyData bytes], [keyData length], hmac_value, &hmac_length) != NULL) {
+						result = [NSData dataWithBytes: hmac_value length: hmac_length];
+					}
 				}
 			}
 		}

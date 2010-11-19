@@ -341,15 +341,27 @@
 
 - (NSString*) decryptPayload: (NSDictionary*) payload withKey: (NSData*) key error: (NSError**) error
 {
-	// Generate the two different keys for HMAC-SHA256 and AES
-	
-	NSMutableData* hmacKeyData = [NSMutableData dataWithData: [@"hmac:" dataUsingEncoding: NSASCIIStringEncoding]];
-	[hmacKeyData appendData: _key];
-	NSData* hmacKey = [hmacKeyData SHA256Hash];
+//	// Generate the two different keys for HMAC-SHA256 and AES
+//	
+//	NSMutableData* hmacKeyData = [NSMutableData dataWithData: [@"hmac:" dataUsingEncoding: NSASCIIStringEncoding]];
+//	[hmacKeyData appendData: _key];
+//	NSData* hmacKey = [hmacKeyData SHA256Hash];
+//
+//	NSMutableData* cryptoKeyData = [NSMutableData dataWithData: [@"encrypt:" dataUsingEncoding: NSASCIIStringEncoding]];
+//	[cryptoKeyData appendData: _key];
+//	NSData* cryptoKey = [cryptoKeyData SHA256Hash];
 
-	NSMutableData* cryptoKeyData = [NSMutableData dataWithData: [@"encrypt:" dataUsingEncoding: NSASCIIStringEncoding]];
-	[cryptoKeyData appendData: _key];
-	NSData* cryptoKey = [cryptoKeyData SHA256Hash];
+	// AES:  T(1) = HMAC-SHA256(key_string, "" + "Sync-AES_256_CBC-HMAC256" + 0x01)
+	// HMAC: T(2) = HMAC-SHA256(key_string, T(1) + Sync-AES_256_CBC-HMAC256" + 0x02)
+	
+	const char* label1 = "Sync-AES_256_CBC-HMAC256\x01";
+	NSMutableData* cryptoHashKey = [NSMutableData dataWithBytes: label1 length: strlen(label1)];
+	NSData* cryptoKey = [key HMACSHA256WithKey: cryptoHashKey];
+	
+	const char* label2 = "Sync-AES_256_CBC-HMAC256\x02";
+	NSMutableData* hmacHashKey = [NSMutableData dataWithData: cryptoKey];
+	[hmacHashKey appendBytes: label2 length: strlen(label2)];
+	NSData* hmacKey = [key HMACSHA256WithKey: hmacHashKey];
 
 	//
 

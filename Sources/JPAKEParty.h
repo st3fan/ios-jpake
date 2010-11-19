@@ -37,7 +37,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 #import <Foundation/Foundation.h>
-#include <openssl/jpake.h>
+#include "jpake.h"
 
 @interface JPAKEParty : NSObject {
   @private
