@@ -341,12 +341,8 @@ static BIGNUM* HashPassword(NSString* password, BIGNUM* q)
 					unsigned char hmac_value[EVP_MAX_MD_SIZE];
 					unsigned int hmac_length;
 					
-					static unsigned char extraction_key[32] = {
-						0x83, 0x5b, 0x86, 0x9f, 0x96, 0xfa, 0x3b, 0x50,
-						0xe6, 0xb5, 0x62, 0x0c, 0x41, 0xca, 0xb1, 0x3a,
-						0x47, 0x7c, 0x76, 0x60, 0x36, 0x95, 0xaa, 0xda,
-						0xde, 0xc4, 0x57, 0x09, 0xc2, 0x6b, 0x09, 0x38
-					};
+					unsigned char extraction_key[32];
+					memset(extraction_key, 0x00, sizeof extraction_key);
 				
 					if (HMAC(md, extraction_key, sizeof extraction_key, (const void*) [keyData bytes], [keyData length], hmac_value, &hmac_length) != NULL) {
 						result = [NSData dataWithBytes: hmac_value length: hmac_length];
