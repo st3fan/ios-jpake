@@ -332,6 +332,8 @@ static BIGNUM* HashPassword(NSString* password, BIGNUM* q)
 			NSData* keyData = BIGNUM2NSData(key);
 			if (keyData != nil)
 			{
+				// SMA This will have to use HMAC-SHA256 instead
+
 				const EVP_MD* md = EVP_get_digestbyname("SHA256");
 				if (md != NULL)
 				{
