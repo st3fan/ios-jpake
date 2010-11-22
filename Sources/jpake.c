@@ -231,7 +231,7 @@ static int verify_zkp(const JPAKE_STEP_PART *p, const BIGNUM *zkpg,
 	* See https://github.com/seb-m/jpake
 	*/
 	
-	BN_mod_exp(gx_modexp_q_p, p->gx, ctx->p.p, ctx->p.q, ctx->ctx);
+	BN_mod_exp(gx_modexp_q_p, p->gx, ctx->p.q, ctx->p.p, ctx->ctx);
 	BN_sub(p_minus_one, ctx->p.p, BN_value_one());
 	BN_zero(zero);
 	
