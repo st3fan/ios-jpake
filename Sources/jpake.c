@@ -218,24 +218,46 @@ static int verify_zkp(const JPAKE_STEP_PART *p, const BIGNUM *zkpg,
     BIGNUM *t1 = BN_new();
     BIGNUM *t2 = BN_new();
     BIGNUM *t3 = BN_new();
+	BIGNUM *gx_modexp_q_p = BN_new();
+	BIGNUM *p_minus_one = BN_new();
+	BIGNUM *zero = BN_new();
+
     int ret = 0;
 
     zkp_hash(h, zkpg, p, ctx->p.peer_name);
+	
+   /*
+    * Check the following: g^x > 0, g^x < (p-1), (g^x)%q == 1
+	* See https://github.com/seb-m/jpake
+	*/
+	
+	BN_mod_exp(gx_modexp_q_p, p->gx, ctx->p.p, ctx->p.q, ctx->ctx);
+	BN_sub(p_minus_one, ctx->p.p, BN_value_one());
+	BN_zero(zero);
+	
+	if ((BN_cmp(p->gx, zero) == 1) &&
+	    (BN_cmp(p->gx, p_minus_one) == -1) &&
+		(BN_cmp(gx_modexp_q_p, BN_value_one()) == 0))
+	{
+	   /* t1 = g^b */
+		BN_mod_exp(t1, zkpg, p->zkpx.b, ctx->p.p, ctx->ctx);
+	   /* t2 = (g^x)^h = g^{hx} */
+		BN_mod_exp(t2, p->gx, h, ctx->p.p, ctx->ctx);
+	   /* t3 = t1 * t2 = g^{hx} * g^b = g^{hx+b} = g^r (allegedly) */
+		BN_mod_mul(t3, t1, t2, ctx->p.p, ctx->ctx);
 
-   /* t1 = g^b */
-    BN_mod_exp(t1, zkpg, p->zkpx.b, ctx->p.p, ctx->ctx);
-   /* t2 = (g^x)^h = g^{hx} */
-    BN_mod_exp(t2, p->gx, h, ctx->p.p, ctx->ctx);
-   /* t3 = t1 * t2 = g^{hx} * g^b = g^{hx+b} = g^r (allegedly) */
-    BN_mod_mul(t3, t1, t2, ctx->p.p, ctx->ctx);
-
-   /* verify t3 == g^r */
-    if(BN_cmp(t3, p->zkpx.gr) == 0)
-	ret = 1;
-    else
-	JPAKEerr(JPAKE_F_VERIFY_ZKP, JPAKE_R_ZKP_VERIFY_FAILED);
+	   /* verify t3 == g^r */
+		if(BN_cmp(t3, p->zkpx.gr) == 0)
+		ret = 1;
+	}
+	
+    if (ret == 0)
+		JPAKEerr(JPAKE_F_VERIFY_ZKP, JPAKE_R_ZKP_VERIFY_FAILED);
 
    /* cleanup */
+	BN_free(zero);
+	BN_free(p_minus_one);
+    BN_free(gx_modexp_q_p);
     BN_free(t3);
     BN_free(t2);
     BN_free(t1);
