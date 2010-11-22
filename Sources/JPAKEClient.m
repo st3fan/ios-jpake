@@ -342,16 +342,8 @@
 
 - (NSString*) decryptPayload: (NSDictionary*) payload withKey: (NSData*) key error: (NSError**) error
 {
-//	// Generate the two different keys for HMAC-SHA256 and AES
-//	
-//	NSMutableData* hmacKeyData = [NSMutableData dataWithData: [@"hmac:" dataUsingEncoding: NSASCIIStringEncoding]];
-//	[hmacKeyData appendData: _key];
-//	NSData* hmacKey = [hmacKeyData SHA256Hash];
-//
-//	NSMutableData* cryptoKeyData = [NSMutableData dataWithData: [@"encrypt:" dataUsingEncoding: NSASCIIStringEncoding]];
-//	[cryptoKeyData appendData: _key];
-//	NSData* cryptoKey = [cryptoKeyData SHA256Hash];
-
+	// Generate the two different keys for HMAC-SHA256 and AES
+	//
 	// AES:  T(1) = HMAC-SHA256(key_string, "" + "Sync-AES_256_CBC-HMAC256" + 0x01)
 	// HMAC: T(2) = HMAC-SHA256(key_string, T(1) + Sync-AES_256_CBC-HMAC256" + 0x02)
 	
