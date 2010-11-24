@@ -70,9 +70,11 @@
 	NSLog(@"JPakeReporter#requestFailed:");
 }
 
-- (void) reportCode: (NSInteger) code message: (NSString*) message
+- (void) reportMessage: (NSString*) message session: (NSString*) session channel: (NSString*) channel;
 {
 	NSURL* url = [NSURL URLWithString: @"/report" relativeToURL: _server];
+
+	NSLog(@"JPAKE Reporter - Reporting %@ %@ %@ to %@", message, session, channel, [url absoluteString]);
 
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: url];
 	if (request != nil)
@@ -80,8 +82,9 @@
 		[request setShouldAttemptPersistentConnection: NO];
 		[request setDelegate: self];
 		[request setNumberOfTimesToRetryOnTimeout: 3];
-		[request addRequestHeader: @"X-KeyExchange-Log-Code" value: [NSString stringWithFormat: @"%d", code]];
-		[request addRequestHeader: @"X-KeyExchange-Log-Message" value: message];
+		[request addRequestHeader: @"X-KeyExchange-Id" value: session];
+		[request addRequestHeader: @"X-KeyExchange-Cid" value: channel];
+		[request addRequestHeader: @"X-KeyExchange-Log" value: message];
 		[_queue addOperation: request];
 	}
 }
