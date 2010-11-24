@@ -88,6 +88,7 @@
 
 @implementation JPAKEClient
 
+@synthesize initialPollRetries = _initialPollRetries;
 @synthesize pollRetries = _pollRetries;
 @synthesize pollInterval = _pollInterval;
 @synthesize pollDelay = _pollDelay;
@@ -99,7 +100,8 @@
 		_delegate = delegate;
 		_reporter = [reporter retain];
 		_clientIdentifier = [[NSString stringWithJPAKEClientIdentifier] retain];
-		_pollRetries = 300;
+		_initialPollRetries = 300;
+		_pollRetries = 10;
 		_pollDelay = 2000;
 		_pollInterval = 1000;
 		_queue = [ASINetworkQueue new];
@@ -559,6 +561,8 @@
 		[request setDidFailSelector: @selector(getDesktopMessageThreeDidFail:)];
 		[_queue addOperation: request];
 	}	
+
+	_pollRetryCount++;
 }
 
 #pragma mark -
@@ -676,6 +680,8 @@
 		[request setDidFailSelector: @selector(getDesktopMessageTwoDidFail:)];
 		[_queue addOperation: request];
 	}
+
+	_pollRetryCount++;
 }
 
 #pragma mark -
@@ -735,7 +741,7 @@
 
 	switch ([request responseStatusCode]) {
 		case 304: {
-			if (_pollRetryCount < _pollRetries) {
+			if (_pollRetryCount < _initialPollRetries) {
 				_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
 					target: self selector: @selector(getDesktopMessageOne) userInfo: nil repeats: NO] retain];
 			} else {
