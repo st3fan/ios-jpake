@@ -62,19 +62,15 @@
 
 - (void) requestFinished: (ASIHTTPRequest*) request
 {
-	NSLog(@"JPakeReporter#requestFinished:");
 }
  
 - (void) requestFailed: (ASIHTTPRequest*) request
 {
-	NSLog(@"JPakeReporter#requestFailed:");
 }
 
 - (void) reportMessage: (NSString*) message session: (NSString*) session channel: (NSString*) channel;
 {
 	NSURL* url = [NSURL URLWithString: @"/report" relativeToURL: _server];
-
-	NSLog(@"JPAKE Reporter - Reporting %@ %@ %@ to %@", message, session, channel, [url absoluteString]);
 
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: url];
 	if (request != nil)
