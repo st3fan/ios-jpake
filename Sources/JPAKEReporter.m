@@ -82,9 +82,15 @@
 		[request setShouldAttemptPersistentConnection: NO];
 		[request setDelegate: self];
 		[request setNumberOfTimesToRetryOnTimeout: 3];
-		[request addRequestHeader: @"X-KeyExchange-Id" value: session];
-		[request addRequestHeader: @"X-KeyExchange-Cid" value: channel];
-		[request addRequestHeader: @"X-KeyExchange-Log" value: message];
+		if (session != nil) {
+			[request addRequestHeader: @"X-KeyExchange-Id" value: session];
+		}
+		if (channel != nil) {
+			[request addRequestHeader: @"X-KeyExchange-Cid" value: channel];
+		}
+		if (message != nil) {
+			[request addRequestHeader: @"X-KeyExchange-Log" value: message];
+		}
 		[_queue addOperation: request];
 	}
 }
