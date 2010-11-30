@@ -57,11 +57,14 @@
 + (NSString*) stringWithJPAKEClientIdentifier;
 @end
 
+extern NSString* JPAKEClientErrorDomain;
+
 enum {
 	kJPAKEClientErrorUnexpectedServerResponse = 1,
 	kJPAKEClientErrorInvalidServerResponse,
 	kJPAKEClientErrorPeerTimeout,
-	kJPAKEClientErrorInvalidCryptoPayload
+	kJPAKEClientErrorInvalidCryptoPayload,
+	kJPAKEClientErrorUnableToRequestChannel
 };
 
 @interface JPAKEClient : NSObject {
@@ -105,6 +108,7 @@ enum {
 - (id) initWithServer: (NSURL*) server delegate: (id<JPAKEClientDelegate>) delegate reporter: (JPAKEReporter*) reporter;
 
 - (void) start;
+- (void) restart;
 - (void) cancel;
 - (void) abort;
 

@@ -43,6 +43,8 @@
 #import "JPAKEClient.h"
 #import "JSON.h"
 
+NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
+
 @implementation NSString (JPAKE)
 
 /**
@@ -90,6 +92,8 @@
 @synthesize pollRetries = _pollRetries;
 @synthesize pollInterval = _pollInterval;
 @synthesize pollDelay = _pollDelay;
+
+#pragma mark -
 
 - (id) initWithServer: (NSURL*) server delegate: (id<JPAKEClientDelegate>) delegate reporter: (JPAKEReporter*) reporter
 {
@@ -142,7 +146,7 @@
 - (NSError*) errorWithCode: (NSInteger) code localizedDescriptionKey: (NSString*) localizedDescriptionKey
 {
 	NSDictionary* userInfo = [NSDictionary dictionaryWithObject: localizedDescriptionKey forKey: @"NSLocalizedDescriptionKey"];
-	return [NSError errorWithDomain: @"JPAKEClient" code: code userInfo: userInfo];
+	return [NSError errorWithDomain: JPAKEClientErrorDomain code: code userInfo: userInfo];
 }
 
 
@@ -163,6 +167,13 @@
 {
 	return [self errorWithCode: kJPAKEClientErrorPeerTimeout
 		localizedDescriptionKey: @"Timeout while waiting for the peer response"];
+}
+
+- (BOOL) requestWasCancelled: (ASIHTTPRequest*) request
+{
+	return request.error != nil
+		&& [request.error.domain isEqualToString: NetworkRequestErrorDomain]
+			&& request.error.code == ASIRequestCancelledErrorType;
 }
 
 #pragma mark -
@@ -454,7 +465,9 @@
 - (void) getDesktopMessageThreeDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#getDesktopMessageThreeDidFail: %@", request);
-	[_delegate client: self didFailWithError: [request error]];
+	if ([self requestWasCancelled: request] == NO) {
+		[_delegate client: self didFailWithError: [request error]];
+	}
 }
 
 - (void) getDesktopMessageThree
@@ -497,7 +510,9 @@
 - (void) putMobileMessageThreeDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#putMobileMessageThreeDidFail: %@", request);
-	[_delegate client: self didFailWithError: [request error]];
+	if ([self requestWasCancelled: request] == NO) {
+		[_delegate client: self didFailWithError: [request error]];
+	}
 }
 
 - (void) putMobileMessageThree
@@ -569,7 +584,9 @@
 - (void) getDesktopMessageTwoDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#getDesktopMessageTwoDidFail: %@", request);
-	[_delegate client: self didFailWithError: [request error]];
+	if ([self requestWasCancelled: request] == NO) {
+		[_delegate client: self didFailWithError: [request error]];
+	}
 }
 
 - (void) getDesktopMessageTwo
@@ -610,7 +627,9 @@
 - (void) putMobileMessageTwoDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#putMobileMessageTwoDidFail: %@", request);
-	[_delegate client: self didFailWithError: [request error]];
+	if ([self requestWasCancelled: request] == NO) {
+		[_delegate client: self didFailWithError: [request error]];
+	}
 }
 
 - (void) putMobileMessageTwo: (NSDictionary*) one
@@ -671,7 +690,9 @@
 - (void) getDesktopMessageOneDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#getDesktopMessageOneDidFail: %@", request);
-	[_delegate client: self didFailWithError: [request error]];
+	if ([self requestWasCancelled: request] == NO) {
+		[_delegate client: self didFailWithError: [request error]];
+	}
 }
 
 - (void) getDesktopMessageOne
@@ -716,7 +737,9 @@
 - (void) putMessageOneDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#putMessageOneDidFail: %@", request);
-	[_delegate client: self didFailWithError: [request error]];
+	if ([self requestWasCancelled: request] == NO) {
+		[_delegate client: self didFailWithError: [request error]];
+	}
 }
 
 - (void) putMessageOne
@@ -750,7 +773,8 @@
 	NSLog(@"JPAKEClient#requestChannelDidFinish: %@", request);
 
 	if ([request responseStatusCode] != 200) {
-		[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
+		[_delegate client: self didFailWithError:
+			[self errorWithCode: kJPAKEClientErrorUnableToRequestChannel localizedDescriptionKey: @"Unable to request channel"]];
 		return;
 	}
 
@@ -765,7 +789,10 @@
 - (void) requestChannelDidFail: (ASIHTTPRequest*) request
 {
 	NSLog(@"JPAKEClient#requestChannelDidFail: %@", request);
-	[_delegate client: self didFailWithError: [request error]];
+	if ([self requestWasCancelled: request] == NO) {
+		[_delegate client: self didFailWithError:
+			[self errorWithCode: kJPAKEClientErrorUnableToRequestChannel localizedDescriptionKey: @"Unable to request channel"]];
+	}
 }
 
 - (void) requestChannel
@@ -789,6 +816,31 @@
 {
 	[ASIHTTPRequest setShouldUpdateNetworkActivityIndicator:NO];
 	[self requestChannel];
+}
+
+- (void) restart
+{
+	[_queue reset];
+
+	[_channel release];
+	_channel = nil;
+	
+	[_secret release];
+	_secret = nil;
+	
+	[_clientIdentifier release];
+	_clientIdentifier = nil;
+	
+	[_party release];
+	_party = nil;
+	
+	[_etag release];
+	_etag = nil;
+	
+	[_key release];
+	_key = nil;
+
+	[self start];
 }
 
 - (void) cancel
