@@ -46,6 +46,6 @@
 }
 
 - (id) initWithServer: (NSURL*) server;
-- (void) reportCode: (NSInteger) code message: (NSString*) message;
+- (void) reportMessage: (NSString*) message session: (NSString*) session channel: (NSString*) channel;
 
 @end

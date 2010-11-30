@@ -81,6 +81,7 @@ enum {
 	JPAKEParty* _party;
 	NSString* _etag;
 	NSData* _key;
+	NSUInteger _initialPollRetries;
 	NSUInteger _pollRetries;
 	NSUInteger _pollDelay;
 	NSUInteger _pollInterval;
@@ -88,7 +89,15 @@ enum {
 }
 
 /**
- * The number of retries while polling for the next message. Default 300 tries.
+ * The number of retries while polling for the first message. Default is 300.
+ */
+
+@property (nonatomic,assign) NSUInteger initialPollRetries;
+
+/**
+ * The number of retries while polling for the next message. Default 10 tries. This is lower
+ * than the initialPollRetries becsause at this point the PAKE exchange has been started so
+ * if messages not appear, we can fail soon.
  */
 
 @property (nonatomic,assign) NSUInteger pollRetries;

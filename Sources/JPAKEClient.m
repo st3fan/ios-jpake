@@ -41,6 +41,7 @@
 #import "NSData+SHA.h"
 
 #import "JPAKEClient.h"
+#import "JPAKEReporter.h"
 #import "JSON.h"
 
 NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
@@ -89,6 +90,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 
 @implementation JPAKEClient
 
+@synthesize initialPollRetries = _initialPollRetries;
 @synthesize pollRetries = _pollRetries;
 @synthesize pollInterval = _pollInterval;
 @synthesize pollDelay = _pollDelay;
@@ -102,7 +104,8 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 		_delegate = delegate;
 		_reporter = [reporter retain];
 		_clientIdentifier = [[NSString stringWithJPAKEClientIdentifier] retain];
-		_pollRetries = 300;
+		_initialPollRetries = 300;
+		_pollRetries = 10;
 		_pollDelay = 2000;
 		_pollInterval = 1000;
 		_queue = [ASINetworkQueue new];
@@ -143,13 +146,13 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	return [NSDictionary dictionaryWithObjectsAndKeys: type, @"type", payload, @"payload", nil];
 }
 
+#pragma mark -
+
 - (NSError*) errorWithCode: (NSInteger) code localizedDescriptionKey: (NSString*) localizedDescriptionKey
 {
 	NSDictionary* userInfo = [NSDictionary dictionaryWithObject: localizedDescriptionKey forKey: @"NSLocalizedDescriptionKey"];
 	return [NSError errorWithDomain: JPAKEClientErrorDomain code: code userInfo: userInfo];
 }
-
-
 
 - (NSError*) unexpectedServerResponseError
 {
@@ -178,7 +181,41 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 
 #pragma mark -
 
-- (BOOL) validateBasicMessage :(NSDictionary*) message ofType: (NSString*) expectedType
+- (void) reportTimeoutError
+{
+	[_reporter reportMessage: @"jpake.error.timeout" session: _clientIdentifier channel: _channel];
+}
+
+- (void) reportInvalidMessageError
+{
+	[_reporter reportMessage: @"jpake.error.invalid" session: _clientIdentifier channel: _channel];
+}
+
+- (void) reportWrongMessageError
+{
+	[_reporter reportMessage: @"jpake.error.wrongmessage" session: _clientIdentifier channel: _channel];
+}
+
+- (void) reportKeyMismatchError
+{
+	[_reporter reportMessage: @"jpake.error.keymismatch" session: _clientIdentifier channel: _channel];
+}
+
+- (void) reportUnexpectedServerResponse
+{
+	[_reporter reportMessage: @"jpake.error.server" session: _clientIdentifier channel: _channel];
+}
+
+#pragma mark -
+
+/**
+ * Check if the basics are correct. The message should be a dictionary, it should have
+ * a string field named 'type' and it should have a 'payload' field that is not nil.
+ *
+ * If we find an error then we call the reporter and return NO. Otherwise YES.
+ */
+
+- (BOOL) validateBasicMessage :(NSDictionary*) message
 {
 	if (message == nil) {
 		return NO;
@@ -189,7 +226,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	}
 	
 	NSString* type = [message objectForKey: @"type"];
-	if (type == nil || [type isEqualToString: expectedType] == NO) {
+	if (type == nil || [type isKindOfClass: [NSString class]] == NO) {
 		return NO;
 	}
 	
@@ -202,9 +239,18 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 
 - (BOOL) validateDesktopMessageOne: (NSDictionary*) message
 {
-	if ([self validateBasicMessage: message ofType: @"sender1"] == NO) {
+	if ([self validateBasicMessage: message] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
+	
+	// Check if the message is of the correct type
+	
+	NSString* type = [message objectForKey: @"type"];
+	if ([type isEqualToString: @"sender1"] == NO) {
+		[self reportWrongMessageError];
+		return NO;
+ 	}
 	
 	// Check for the existence of a payload dictionary
 	
@@ -217,37 +263,45 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	
 	NSDictionary* zkp_x1 = [payload objectForKey: @"zkp_x1"];
 	if (zkp_x1 == nil || [zkp_x1 isKindOfClass: [NSDictionary class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 
 	NSDictionary* zkp_x2 = [payload objectForKey: @"zkp_x1"];
 	if (zkp_x2 == nil || [zkp_x2 isKindOfClass: [NSDictionary class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 	
 	// Check for the presence of the numbers .. we just check if they are strings
 
 	if ([[payload objectForKey: @"gx1"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 
 	if ([[payload objectForKey: @"gx2"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 
 	if ([[zkp_x1 objectForKey: @"gr"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 
 	if ([[zkp_x1 objectForKey: @"b"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 
 	if ([[zkp_x2 objectForKey: @"gr"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 
 	if ([[zkp_x2 objectForKey: @"b"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 	
@@ -256,14 +310,24 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 
 - (BOOL) validateDesktopMessageTwo: (NSDictionary*) message
 {
-	if ([self validateBasicMessage: message ofType: @"sender2"] == NO) {
+	if ([self validateBasicMessage: message] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
+
+	// Check if the message is of the correct type
+	
+	NSString* type = [message objectForKey: @"type"];
+	if ([type isEqualToString: @"sender2"] == NO) {
+		[self reportWrongMessageError];
+		return NO;
+ 	}
 
 	// Check for the existence of a payload dictionary
 	
 	NSDictionary* payload = [message objectForKey: @"payload"];
 	if (payload == nil || [payload isKindOfClass: [NSDictionary class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 	
@@ -271,20 +335,24 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	
 	NSDictionary* zkp_A = [payload objectForKey: @"zkp_A"];	
 	if (zkp_A == nil || [zkp_A isKindOfClass: [NSDictionary class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 	
 	// Check for the presence of the numbers .. we just check if they are strings
 
 	if ([[payload objectForKey: @"A"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 
 	if ([[zkp_A objectForKey: @"gr"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 
 	if ([[zkp_A objectForKey: @"b"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 
@@ -293,61 +361,74 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 
 - (BOOL) validateDesktopMessageThree: (NSDictionary*) message
 {
-	if ([self validateBasicMessage: message ofType: @"sender3"] == NO) {
+	if ([self validateBasicMessage: message] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
+
+	// Check if the message is of the correct type
+	
+	NSString* type = [message objectForKey: @"type"];
+	if ([type isEqualToString: @"sender3"] == NO) {
+		[self reportWrongMessageError];
+		return NO;
+ 	}
 	
 	// Check for the existence of a payload dictionary
 	
 	NSDictionary* payload = [message objectForKey: @"payload"];
 	if (payload == nil || [payload isKindOfClass: [NSDictionary class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}
 
 	// Check if the crypto fields are there
 	
 	if ([[payload objectForKey: @"ciphertext"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}	
 
 	if ([[payload objectForKey: @"IV"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}	
 
 	if ([[payload objectForKey: @"hmac"] isKindOfClass: [NSString class]] == NO) {
+		[self reportInvalidMessageError];
 		return NO;
 	}	
 
 	return YES;
 }
 
-#pragma mark -
-
-- (void) deleteChannelDidFinish: (ASIHTTPRequest*) request
-{
-	NSLog(@"JPAKEClient#deleteChannelDidFinish");
-}
-
-- (void) deleteChannelDidFail: (ASIHTTPRequest*) request
-{
-	NSLog(@"JPAKEClient#deleteChannelDidFail");
-}
-
-- (void) deleteChannel
-{
-	NSLog(@"JPAKEClient#deleteChannel");
-	
-	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]];
-	if (request != nil) {
-		[request setShouldAttemptPersistentConnection: NO];
-		[request setRequestMethod: @"DELETE"];
-		[request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
-		[request setDelegate: self];
-		[request setDidFinishSelector: @selector(deleteChannelDidFinish:)];
-		[request setDidFailSelector: @selector(deleteChannelDidFail:)];
-		[_queue addOperation: request];
-	}		
-}
+//#pragma mark -
+//
+//- (void) deleteChannelDidFinish: (ASIHTTPRequest*) request
+//{
+//	NSLog(@"JPAKEClient#deleteChannelDidFinish");
+//}
+//
+//- (void) deleteChannelDidFail: (ASIHTTPRequest*) request
+//{
+//	NSLog(@"JPAKEClient#deleteChannelDidFail");
+//}
+//
+//- (void) deleteChannel
+//{
+//	NSLog(@"JPAKEClient#deleteChannel");
+//	
+//	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: [NSURL URLWithString: [NSString stringWithFormat: @"/%@", _channel] relativeToURL: _server]];
+//	if (request != nil) {
+//		[request setShouldAttemptPersistentConnection: NO];
+//		[request setRequestMethod: @"DELETE"];
+//		[request addRequestHeader: @"X-KeyExchange-Id" value: _clientIdentifier];
+//		[request setDelegate: self];
+//		[request setDidFinishSelector: @selector(deleteChannelDidFinish:)];
+//		[request setDidFailSelector: @selector(deleteChannelDidFail:)];
+//		[_queue addOperation: request];
+//	}		
+//}
 
 #pragma mark -
 
@@ -372,6 +453,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	NSData* iv = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"IV"]] autorelease];
 	if (iv == nil || [iv length] != 16) {
 		if (error != NULL) {
+			[self reportInvalidMessageError];
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
 		}
 		return nil;
@@ -380,6 +462,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	NSData* ciphertext = [[[NSData alloc] initWithBase64EncodedString: [payload objectForKey: @"ciphertext"]] autorelease];
 	if (ciphertext == nil || [ciphertext length] == 0) {
 		if (error != NULL) {
+			[self reportInvalidMessageError];
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
 		}
 		return nil;
@@ -388,6 +471,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	NSData* hmac = [[[NSData alloc] initWithBase16EncodedString: [payload objectForKey: @"hmac"]] autorelease];
 	if (hmac == nil || [hmac length] != 32) {
 		if (error != NULL) {
+			[self reportInvalidMessageError];
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
 		}
 		return nil;
@@ -398,6 +482,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	NSData* hmacValue = [cipherTextData HMACSHA256WithKey: hmacKey];
 	if (hmacValue == nil || [hmac isEqualToData: hmacValue] == NO) {
 		if (error != NULL) {
+			[self reportKeyMismatchError];
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
 		}
 		return nil;
@@ -406,6 +491,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	NSData* plaintext = [NSData plaintextDataByAES256DecryptingCiphertextData: ciphertext key: cryptoKey iv: iv];
 	if (plaintext == nil) {
 		if (error != NULL) {
+			[self reportKeyMismatchError];
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
 		}
 		return nil;
@@ -414,6 +500,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	NSString* json = [[[NSString alloc] initWithData: plaintext encoding: NSUTF8StringEncoding] autorelease];
 	if (json == nil) {
 		if (error != NULL) {
+			[self reportInvalidMessageError];
 			*error = [self errorWithCode: kJPAKEClientErrorInvalidCryptoPayload localizedDescriptionKey: @"The message contains invalid crypto payload"];
 		}
 		return nil;
@@ -435,6 +522,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 				_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0 target: self
 					selector: @selector(getDesktopMessageThree) userInfo: nil repeats: NO] retain];
 			} else {
+				[self reportTimeoutError];
 				[_delegate client: self didFailWithError: [self timeoutError]];
 			}
 			break;
@@ -443,6 +531,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 		case 200: {
 			NSDictionary* message = [[request responseString] JSONValue];
 			if ([self validateDesktopMessageThree: message] == NO) {
+				[self reportInvalidMessageError];
 				[_delegate client: self didFailWithError: [self invalidServerResponseError]];
 			} else {
 				NSError* error = nil;
@@ -457,6 +546,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 		}
 		
 		default: {
+			[self reportUnexpectedServerResponse];
 			[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		}
 	}
@@ -484,6 +574,8 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 		[request setDidFailSelector: @selector(getDesktopMessageThreeDidFail:)];
 		[_queue addOperation: request];
 	}	
+
+	_pollRetryCount++;
 }
 
 #pragma mark -
@@ -493,6 +585,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	NSLog(@"JPAKEClient#putMobileMessageThreeDidFinish: %@", request);
 
 	if ([request responseStatusCode] != 200) {
+		[self reportUnexpectedServerResponse];
 		[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		return;
 	}
@@ -554,6 +647,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 				_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
 					target: self selector: @selector(getDesktopMessageTwo) userInfo: nil repeats: NO] retain];
 			} else {
+				[self reportTimeoutError];
 				[_delegate client: self didFailWithError: [self timeoutError]];
 			}
 			break;
@@ -562,6 +656,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 		case 200: {
 			NSDictionary* message = [[request responseString] JSONValue];
 			if ([self validateDesktopMessageTwo: message] == NO) {
+				[self reportInvalidMessageError];
 				[_delegate client: self didFailWithError: [self invalidServerResponseError]];
 				return;
 			}
@@ -576,6 +671,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 		}
 		
 		default: {
+			[self reportUnexpectedServerResponse];
 			[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		}
 	}
@@ -601,6 +697,8 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 		[request setDidFailSelector: @selector(getDesktopMessageTwoDidFail:)];
 		[_queue addOperation: request];
 	}
+
+	_pollRetryCount++;
 }
 
 #pragma mark -
@@ -610,6 +708,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	NSLog(@"JPAKEClient#putMobileMessageTwoDidFinish: %@", request);
 
 	if ([request responseStatusCode] != 200) {
+		[self reportUnexpectedServerResponse];
 		[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		return;
 	}
@@ -661,10 +760,11 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 
 	switch ([request responseStatusCode]) {
 		case 304: {
-			if (_pollRetryCount < _pollRetries) {
+			if (_pollRetryCount < _initialPollRetries) {
 				_timer = [[NSTimer scheduledTimerWithTimeInterval: ((NSTimeInterval) _pollInterval) / 1000.0
 					target: self selector: @selector(getDesktopMessageOne) userInfo: nil repeats: NO] retain];
 			} else {
+				[self reportTimeoutError];
 				[_delegate client: self didFailWithError: [self timeoutError]];
 			}
 			break;
@@ -673,6 +773,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 		case 200: {
 			NSDictionary* message = [[request responseString] JSONValue];
 			if ([self validateDesktopMessageOne: message] == NO) {
+				[self reportInvalidMessageError];
 				[_delegate client: self didFailWithError: [self invalidServerResponseError]];
 			} else {
 				NSDictionary* payload = [message objectForKey: @"payload"];
@@ -682,6 +783,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 		}
 		
 		default: {
+			[self reportUnexpectedServerResponse];
 			[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		}
 	}
@@ -773,8 +875,8 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 	NSLog(@"JPAKEClient#requestChannelDidFinish: %@", request);
 
 	if ([request responseStatusCode] != 200) {
-		[_delegate client: self didFailWithError:
-			[self errorWithCode: kJPAKEClientErrorUnableToRequestChannel localizedDescriptionKey: @"Unable to request channel"]];
+		[self reportUnexpectedServerResponse];
+		[_delegate client: self didFailWithError: [self unexpectedServerResponseError]];
 		return;
 	}
 
