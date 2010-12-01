@@ -75,6 +75,7 @@
 	ASIHTTPRequest* request = [ASIHTTPRequest requestWithURL: url];
 	if (request != nil)
 	{
+		[request setRequestMethod: @"POST"];
 		[request setShouldAttemptPersistentConnection: NO];
 		[request setDelegate: self];
 		[request setNumberOfTimesToRetryOnTimeout: 3];
