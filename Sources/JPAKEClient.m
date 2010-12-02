@@ -807,7 +807,7 @@ NSString* JPAKEClientErrorDomain = @"JPAKEClientErrorDomain";
 		[request addRequestHeader: @"If-None-Match" value: _etag];
 		[request setDidFinishSelector: @selector(getDesktopMessageOneDidFinish:)];
 		[request setDidFailSelector: @selector(getDesktopMessageOneDidFail:)];
-		[request startAsynchronous];
+		[_queue addOperation: request];
 	}
 	_pollRetryCount++;
 }
